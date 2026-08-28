@@ -76,11 +76,16 @@
 
   /* ------------------------------------------------------------ chips --- */
   const statusChip = (st) => `<span class="status" data-status="${st}">${esc(S().STATUSES[st].short)}</span>`;
-  const netBadge = (p, lg = false) => {
-    const surface = p.network === 'ads' ? (p.adPlatform || 'instagram') : p.network;
-    const ic = p.network === 'ads' ? 'megaphone' : S().NETWORKS[p.network].icon;
-    return `<span class="net-badge${lg ? ' net-badge--lg' : ''}" data-net="${p.network === 'ads' ? 'ads' : surface}" title="${esc(S().NETWORKS[p.network].name)}">${icon(ic)}</span>`;
+  /** Selo de uma rede. Recebe o id da rede, não a peça. */
+  const netBadge = (net, lg = false) => {
+    const cfg = S().NETWORKS[net];
+    if (!cfg) return '';
+    return `<span class="net-badge${lg ? ' net-badge--lg' : ''}" data-net="${net}" title="${esc(cfg.name)}">${icon(cfg.icon)}</span>`;
   };
+  /** Selos de todas as redes da peça, mais o de patrocinado quando for o caso. */
+  const netBadges = (p, lg = false) =>
+    (p.networks || []).map((n) => netBadge(n, lg)).join('') +
+    (p.sponsored ? `<span class="net-badge${lg ? ' net-badge--lg' : ''}" data-net="ads" title="${esc(S().SPONSOR.name)}">${icon(S().SPONSOR.icon)}</span>` : '');
   const fmtBadge = (p) => {
     const f = S().FORMATS[p.format];
     const n = p.media?.length || 0;
@@ -116,14 +121,15 @@
        tem estrutura. O teclado continua funcionando (Enter/Espaço). */
     const node = el('div', {
       class: 'card', 'data-post': p.id, 'data-status': p.status,
-      role: 'button', tabindex: '0', 'aria-label': `${p.title} — ${S().STATUSES[p.status].name}`,
+      role: 'button', tabindex: '0',
+      'aria-label': `${p.title} — ${(p.networks || []).map((n) => S().NETWORKS[n]?.name).join(', ')} — ${S().STATUSES[p.status].name}`,
       draggable: draggable ? 'true' : null,
       onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); node.click(); } },
       html: `
       <div class="card__media">
         ${m?.src ? `<img src="${esc(m.src)}" alt="${esc(m.alt || '')}" loading="lazy">` : '<div style="height:100%"></div>'}
         <div class="card__topline">
-          ${netBadge(p)}
+          ${netBadges(p)}
           <span class="spacer" style="flex:1"></span>
           ${statusChip(p.status)}
         </div>
@@ -178,16 +184,22 @@
 
   /* -------------------------------------------------------- contadores -- */
   /** Contador de caracteres com os limites reais da rede. */
-  function counter(text, net) {
-    const cfg = S().NETWORKS[net] || S().NETWORKS.instagram;
+  /**
+   * Contador de caracteres e hashtags. Aceita uma rede ou várias — com mais de
+   * uma, o limite que vale é o mais apertado, e o título diz qual rede aperta.
+   */
+  function counter(text, nets) {
+    const lista = [].concat(nets || 'instagram').filter((n) => S().NETWORKS[n]);
+    const cfgs = (lista.length ? lista : ['instagram']).map((n) => S().NETWORKS[n]);
+    const apertada = cfgs.reduce((a, b) => (b.capMax < a.capMax ? b : a));
+    const tagCfg = cfgs.reduce((a, b) => (b.hashSoft < a.hashSoft ? b : a));
     const n = text.length;
-    const over = n > cfg.capMax;
-    const near = n > cfg.capMax * 0.9;
     const tags = global.U.countHashtags(text);
-    const tagWarn = tags > cfg.hashSoft;
-    return `<span class="counter ${over ? 'is-over' : near ? 'is-warn' : ''}">${n}/${cfg.capMax}</span>
-      ${tags ? `<span class="counter ${tags > cfg.hashMax ? 'is-over' : tagWarn ? 'is-warn' : ''}" title="Recomendado: até ${cfg.hashSoft}">#${tags}</span>` : ''}`;
+    const over = n > apertada.capMax;
+    const near = n > apertada.capMax * 0.9;
+    return `<span class="counter ${over ? 'is-over' : near ? 'is-warn' : ''}" title="Limite do ${esc(apertada.name)}">${n}/${apertada.capMax}</span>
+      ${tags ? `<span class="counter ${tags > tagCfg.hashMax ? 'is-over' : tags > tagCfg.hashSoft ? 'is-warn' : ''}" title="${esc(tagCfg.name)} recomenda até ${tagCfg.hashSoft}">#${tags}</span>` : ''}`;
   }
 
-  global.UI = { toast, modal, confirm, avatarHTML, statusChip, netBadge, fmtBadge, postCard, segmented, empty, counter, suggesterChip, lastOpenNote };
+  global.UI = { toast, modal, confirm, avatarHTML, statusChip, netBadge, netBadges, fmtBadge, postCard, segmented, empty, counter, suggesterChip, lastOpenNote };
 })(window);

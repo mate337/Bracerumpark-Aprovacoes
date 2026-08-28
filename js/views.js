@@ -72,8 +72,29 @@
 
     const lbody = el('div', { class: 'panel__body stack' });
 
+    const total = S().STATUS_ORDER.reduce((s, k) => s + c[k], 0);
+
+    if (!total) {
+      /* primeira execução: não adianta mostrar um funil de zeros */
+      lbody.append(global.UI.empty(
+        admin ? 'sparkles' : 'inbox',
+        admin ? 'Nenhuma peça ainda' : 'Nada para revisar ainda',
+        admin
+          ? 'Crie a primeira postagem: escolha as redes, suba as mídias e escreva as opções de legenda. Quem aprova recebe a peça já montada.'
+          : 'Assim que a equipe enviar uma peça para aprovação, ela aparece aqui.',
+        admin ? el('button', {
+          class: 'btn btn--primary', html: `${icon('plus')}Criar a primeira postagem`,
+          onclick: () => global.App.go({ view: 'compose' }),
+        }) : null,
+      ));
+      left.append(lbody);
+      grid.append(left, el('div', { class: 'stack' }));
+      root.append(grid);
+      requestAnimationFrame(() => $$('[data-count]', root).forEach((n) => countUp(n, +n.dataset.count)));
+      return root;
+    }
+
     /* barra de pipeline */
-    const total = Math.max(1, S().STATUS_ORDER.reduce((s, k) => s + c[k], 0));
     lbody.append(el('div', { class: 'pipe', html: `
       <div class="pipe__bar">${S().STATUS_ORDER.map((k) => c[k]
         ? `<span class="pipe__seg" data-status="${k}" style="flex:${c[k]};" title="${esc(S().STATUSES[k].name)}: ${c[k]}"></span>` : '').join('')}</div>
@@ -134,7 +155,7 @@
       const list = el('div', { class: 'feed-list' });
       proximos.forEach((p) => list.append(el('button', {
         class: 'feed-item', 'data-status': p.status, onclick: () => global.App.go({ view: 'post', postId: p.id }),
-        html: `${global.UI.netBadge(p)}
+        html: `<span class="row row--tight" style="gap:4px">${global.UI.netBadges(p)}</span>
           <span class="feed-item__body">
             <span class="feed-item__txt"><b>${esc(p.title)}</b></span>
             <span class="feed-item__time">${esc(fmtDate(p.scheduledAt, 'full'))} · ${esc(S().STATUSES[p.status].short)}</span>
@@ -162,9 +183,10 @@
     const filtros = st.filters || {};
     let lista = St().visiblePosts();
 
-    if (filtros.net) lista = lista.filter((p) => p.network === filtros.net);
+    if (filtros.net) lista = lista.filter((p) => (p.networks || []).includes(filtros.net));
+    if (filtros.sponsored) lista = lista.filter((p) => p.sponsored);
     if (filtros.status) lista = lista.filter((p) => p.status === filtros.status);
-    if (filtros.mine) lista = lista.filter((p) => St().currentLevel(p)?.approverId === St().me().id && p.status === 'revisao');
+    if (filtros.mine) lista = lista.filter((p) => St().canDecide(p));
     if (st.query) {
       const q = st.query.toLowerCase();
       lista = lista.filter((p) => (p.title + ' ' + p.code + ' ' + (p.captions || []).map((c) => c.text).join(' ') + ' ' + (p.tags || []).join(' ')).toLowerCase().includes(q));
@@ -194,11 +216,15 @@
       class: 'pill' + (on ? ' is-on' : ''), onclick,
       html: `${ic ? icon(ic) : ''}${esc(label)}${n !== undefined ? `<span class="pill__n">${n}</span>` : ''}`,
     });
-    pills.append(mk('Todas', !filtros.net && !filtros.status && !filtros.mine, () => global.App.setFilters({})));
+    const semFiltro = !filtros.net && !filtros.status && !filtros.mine && !filtros.sponsored;
+    pills.append(mk('Todas', semFiltro, () => global.App.setFilters({})));
     Object.values(S().NETWORKS).forEach((n) => {
-      const q = St().visiblePosts().filter((p) => p.network === n.id).length;
+      const q = St().visiblePosts().filter((p) => (p.networks || []).includes(n.id)).length;
       pills.append(mk(n.name, filtros.net === n.id, () => global.App.setFilters({ ...filtros, net: filtros.net === n.id ? null : n.id }), n.icon, q));
     });
+    const qPago = St().visiblePosts().filter((p) => p.sponsored).length;
+    pills.append(mk(S().SPONSOR.name, !!filtros.sponsored,
+      () => global.App.setFilters({ ...filtros, sponsored: !filtros.sponsored }), S().SPONSOR.icon, qPago));
     bar.append(pills);
     bar.append(el('span', { class: 'spacer' }));
     const statusSel = el('select', { class: 'select', style: 'width:auto', onchange: (e) => global.App.setFilters({ ...filtros, status: e.target.value || null }) });
@@ -296,7 +322,7 @@
         html: `
         <td>${p.media?.[0]?.src ? `<img class="tbl__thumb" src="${esc(p.media[0].src)}" alt="" loading="lazy">` : '<span class="tbl__thumb" style="display:block"></span>'}</td>
         <td><div style="font-weight:600">${esc(p.title)}</div><div class="tiny dim">${esc(p.code)} · ${esc(S().FORMATS[p.format].name)}</div></td>
-        <td class="opt">${global.UI.netBadge(p)}</td>
+        <td class="opt"><span class="row row--tight" style="gap:4px">${global.UI.netBadges(p)}</span></td>
         <td>${global.UI.statusChip(p.status)}</td>
         <td class="opt tiny muted">${p.scheduledAt ? esc(fmtDate(p.scheduledAt, 'full')) : '—'}</td>
         <td class="opt">${open ? `<span class="chip chip--sm chip--brand">${icon('msg')}${open}</span>` : '<span class="tiny dim">—</span>'}</td>
@@ -352,7 +378,7 @@
       (porDia[key] || []).sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt)).forEach((p) => {
         const ev = el('button', {
           class: 'cal__ev', 'data-status': p.status, draggable: St().isAdmin() ? 'true' : null,
-          'data-net': p.network === 'ads' ? 'ads' : p.network,
+          'data-net': (p.networks || ['instagram'])[0],
           html: `<i></i><span>${esc(fmtDate(p.scheduledAt, 'time'))} ${esc(p.title)}</span>`,
           onclick: () => global.App.go({ view: 'post', postId: p.id }),
         });
@@ -398,8 +424,9 @@
 
     const admin = St().isAdmin();
     const me = St().me();
-    const lvl = St().currentLevel(p);
-    const minhaVez = p.status === 'revisao' && (!lvl || lvl.approverId === me.id || admin);
+    const lvl = St().myLevel(p) || St().currentLevel(p);
+    const minhaVez = St().canDecide(p);
+    const rede = (p.networks || []).includes(st.net) ? st.net : (p.networks || ['instagram'])[0];
 
     const root = el('div', { class: 'detail' });
 
@@ -423,6 +450,19 @@
       { id: 'desktop', label: 'Desktop', icon: 'monitor' },
     ], st.device || 'mobile', (id) => global.App.go({ device: id }, true), { name: 'Dispositivo' }));
 
+    /* uma peça pode ir para até três redes: escolha qual está sendo revisada */
+    if ((p.networks || []).length > 1) {
+      const sw = el('div', { class: 'net-switch', role: 'tablist', 'aria-label': 'Rede' });
+      p.networks.forEach((n) => sw.append(el('button', {
+        class: (n === rede ? 'is-on' : ''), 'data-net': n, role: 'tab',
+        'aria-selected': n === rede ? 'true' : 'false',
+        style: `--nc:var(--net-${n})`,
+        html: `${icon(S().NETWORKS[n].icon)}<span>${esc(S().NETWORKS[n].name)}</span>`,
+        onclick: () => global.App.go({ net: n }, true),
+      })));
+      bar.append(sw);
+    }
+
     bar.append(el('span', { class: 'spacer' }));
 
     const modo = St().settings().previewMode;
@@ -434,39 +474,46 @@
 
     if (!admin || true) {
       bar.append(el('button', {
-        class: 'btn btn--sm' + (st.arming ? ' btn--primary' : ''),
-        html: `${icon('pin')}${st.arming ? 'Clique na peça' : 'Comentar no ponto'}`,
+        class: 'btn btn--sm btn--compact' + (st.arming ? ' btn--primary' : ''),
+        html: `${icon('pin')}<span>${st.arming ? 'Clique na peça' : 'Comentar no ponto'}</span>`,
+        title: 'Comentar em um ponto da peça',
         onclick: () => global.App.go({ arming: !st.arming }, true),
       }));
     }
     if (admin) {
-      bar.append(el('button', { class: 'btn btn--sm', html: `${icon('edit')}Editar`, onclick: () => global.App.go({ view: 'compose', postId: p.id }) }));
+      bar.append(el('button', {
+        class: 'btn btn--sm btn--compact', title: 'Editar a peça',
+        html: `${icon('edit')}<span>Editar</span>`,
+        onclick: () => global.App.go({ view: 'compose', postId: p.id }),
+      }));
     }
     stage.append(bar);
 
-    /* preview */
+    /* preview — o carrossel e o “ver mais” andam sozinhos dentro do template */
     const canvas = el('div', { class: 'stage__canvas' });
     const pins = (p.activity || []).filter((a) => a.pin && !a.resolved);
     const preview = global.Preview.render(p, {
+      net: rede,
       context: st.context || 'feed',
       device: st.device || 'mobile',
       mode: St().settings().previewMode,
       slide: st.slide || 0,
-      pins, activePin: st.activePin, arming: st.arming,
+      pins, activePin: st.activePin, arming: st.arming, expanded: st.expanded,
+      /* o preview manda o estado de volta sem provocar redesenho: quem anda
+         no carrossel é ele, o app só precisa saber em qual mídia estamos */
+      onSlide: (i) => { global.App.state.slide = i; },
+      onExpand: (v) => { global.App.state.expanded = v; },
     });
     preview.append(el('span', { class: 'sim-tag', text: 'simulação' }));
     canvas.append(preview);
     canvas.append(el('p', {
-      class: 'ctx-note', html: `${icon('eye')}Simulação de layout — cortes de legenda e proporções seguem as regras de ${esc(S().NETWORKS[p.network].name)}.`,
+      class: 'ctx-note', html: `${icon('eye')}Simulação de layout — cortes e proporções seguem as regras de ${esc(S().NETWORKS[rede].name)}.`,
     }));
     stage.append(canvas);
 
-    /* carrossel + marcadores */
-    global.U.on(canvas, 'click', '[data-slide]', (e, t) => {
-      e.stopPropagation();
-      const n = (st.slide || 0) + Number(t.dataset.slide);
-      global.App.go({ slide: Math.max(0, Math.min(p.media.length - 1, n)) }, true);
-    });
+    /* a faixa de mídias na aba Detalhes fala com o carrossel por aqui */
+    stage.__goTo = (i) => preview.__preview?.goTo(i);
+
     global.U.on(canvas, 'click', '[data-pin]', (e, t) => {
       e.stopPropagation();
       global.App.go({ activePin: t.dataset.pin, tab: 'conversa' }, true);
@@ -476,7 +523,10 @@
         const r = t.getBoundingClientRect();
         const x = ((e.clientX - r.left) / r.width) * 100;
         const y = ((e.clientY - r.top) / r.height) * 100;
-        abrirComentarioComPino(p, { mediaIndex: st.slide || 0, x: +x.toFixed(1), y: +y.toFixed(1) });
+        abrirComentarioComPino(p, {
+          mediaIndex: preview.__preview?.slide ?? (st.slide || 0),
+          x: +x.toFixed(1), y: +y.toFixed(1),
+        });
       });
     }
 
@@ -485,10 +535,12 @@
 
     /* cabeçalho */
     const shead = el('div', { class: 'side__head' });
-    shead.append(el('div', { class: 'row row--tight', html: `${global.UI.netBadge(p, true)}
+    const nomesRedes = (p.networks || []).map((n) => S().NETWORKS[n].name).join(' · ');
+    shead.append(el('div', { class: 'row row--tight', html: `
+      <span class="row row--tight" style="gap:4px">${global.UI.netBadges(p, true)}</span>
       <span style="flex:1;min-width:0">
         <span class="h3 truncate" style="display:block">${esc(p.title)}</span>
-        <span class="tiny dim">${esc(S().NETWORKS[p.network].name)} · ${esc(S().FORMATS[p.format].name)}${p.network === 'ads' ? ` em ${esc(S().NETWORKS[p.adPlatform || 'instagram'].name)}` : ''}</span>
+        <span class="tiny dim">${esc(nomesRedes)} · ${esc(S().FORMATS[p.format].name)}${p.sponsored ? ' · patrocinado' : ''}</span>
       </span>
       ${global.UI.statusChip(p.status)}` }));
 
@@ -552,7 +604,7 @@
      ABA — LEGENDAS
      ========================================================================== */
   function painelLegendas(body, p, admin) {
-    const cfg = S().NETWORKS[p.network];
+    const usaPrimeiroComentario = (p.networks || []).some((n) => S().NETWORKS[n].firstComment);
 
     body.append(el('div', {
       class: 'row', html: `<span class="eyebrow" style="flex:1">Opções de legenda</span>
@@ -573,7 +625,7 @@
           <span class="cap-opt__pick"></span>
           <span class="cap-opt__tag">${esc(c.label)}</span>
           <span style="flex:1"></span>
-          ${global.UI.counter(c.text, p.network)}
+          ${global.UI.counter(c.text, p.networks)}
         </div>
         <div class="cap-opt__txt">${richText(c.text)}</div>
         <div class="cap-opt__meta">${global.UI.avatarHTML(autor, 'xs')}<span>${esc(autor.name.split(' ')[0])} · ${esc(ago(c.createdAt))}</span></div>`,
@@ -615,13 +667,13 @@
       }));
     }
 
-    if (cfg.firstComment) {
+    if (usaPrimeiroComentario) {
       body.append(el('hr', { class: 'divider' }));
       const f = el('div', { class: 'field' });
       f.append(el('label', { class: 'label', html: `${icon('hash')} Primeiro comentário` }));
       const ta = el('textarea', { class: 'textarea', style: 'min-height:64px', placeholder: 'Hashtags que não cabem na legenda…', text: p.firstComment || '', disabled: !admin });
       ta.addEventListener('input', global.U.debounce(() => St().updatePost(p.id, { firstComment: ta.value }, 'post:silent'), 400));
-      f.append(ta, el('span', { class: 'hint', text: cfg.note }));
+      f.append(ta, el('span', { class: 'hint', text: 'Vale para o Instagram; nas outras redes é ignorado.' }));
       body.append(f);
     }
   }
@@ -631,9 +683,9 @@
       title: `Editar ${c.label}`, icon: 'edit',
       build: (b) => {
         const ta = el('textarea', { class: 'textarea', style: 'min-height:220px', text: c.text });
-        const info = el('div', { class: 'row', html: `<span style="flex:1"></span>${global.UI.counter(c.text, p.network)}` });
-        ta.addEventListener('input', () => { info.innerHTML = `<span style="flex:1"></span>${global.UI.counter(ta.value, p.network)}`; });
-        b.append(ta, info, el('p', { class: 'hint', text: S().NETWORKS[p.network].note }));
+        const info = el('div', { class: 'row', html: `<span style="flex:1"></span>${global.UI.counter(c.text, p.networks)}` });
+        ta.addEventListener('input', () => { info.innerHTML = `<span style="flex:1"></span>${global.UI.counter(ta.value, p.networks)}`; });
+        b.append(ta, info, ...(p.networks || []).map((n) => el('p', { class: 'hint', text: `${S().NETWORKS[n].name}: ${S().NETWORKS[n].note}` })));
         b._ta = ta;
       },
       foot: (close) => [
@@ -770,7 +822,7 @@
       const sug = el('div', {
         class: 'cap-opt', style: 'cursor:default',
         html: `<div class="cap-opt__head"><span class="cap-opt__tag">Redação sugerida</span>
-          <span style="flex:1"></span>${global.UI.counter(a.suggestion.text, p.network)}</div>
+          <span style="flex:1"></span>${global.UI.counter(a.suggestion.text, p.networks)}</div>
         <div class="cap-opt__txt">${richText(a.suggestion.text)}</div>`,
       });
       if (admin && !a.suggestion.applied) {
@@ -864,10 +916,10 @@
     body.append(el('div', {
       class: 'stack stack--sm', html: `<span class="eyebrow">Peça</span>` + dl([
         ['Código', esc(p.code)],
-        ['Rede', esc(S().NETWORKS[p.network].name) + (p.network === 'ads' ? ` · ${esc(S().NETWORKS[p.adPlatform || 'instagram'].name)}` : '')],
+        ['Redes', (p.networks || []).map((n) => `<span class="chip chip--sm">${esc(S().NETWORKS[n].name)}</span>`).join(' ') + (p.sponsored ? ` <span class="chip chip--sm chip--brand">${esc(S().SPONSOR.name)}</span>` : '')],
         ['Formato', esc(S().FORMATS[p.format].name)],
         ['Mídias', `${p.media?.length || 0} ${p.media?.length === 1 ? 'arquivo' : 'arquivos'}`],
-        ['Proporção', esc(global.Preview.ratioOf(p))],
+        ['Proporção', (p.networks || []).map((n) => `${S().NETWORKS[n].name}: ${esc(global.Preview.ratioOf(p, n))}`).join('<br>')],
         ['Prioridade', esc(p.priority || 'normal')],
         ['Agenda', p.scheduledAt ? esc(fmtDate(p.scheduledAt, 'full')) : '<span class="dim">sem data</span>'],
         ['Criada por', esc(St().user(p.createdBy).name) + ' · ' + esc(ago(p.createdAt))],
@@ -877,7 +929,7 @@
       ]),
     }));
 
-    if (p.network === 'ads' && p.ad) {
+    if (p.sponsored && p.ad) {
       body.append(el('hr', { class: 'divider' }));
       body.append(el('div', {
         class: 'stack stack--sm', html: `<span class="eyebrow">Mídia paga</span>` + dl([
@@ -910,7 +962,10 @@
     body.append(el('span', { class: 'eyebrow', text: 'Mídias' }));
     const strip = el('div', { class: 'media-strip' });
     (p.media || []).forEach((m, i) => strip.append(el('div', {
-      class: 'media-thumb', onclick: () => global.App.go({ slide: i }, true),
+      class: 'media-thumb', onclick: () => {
+        global.App.state.slide = i;
+        global.U.$('.stage')?.__goTo?.(i);
+      },
       html: `${m.src ? `<img src="${esc(m.src)}" alt="${esc(m.alt || '')}">` : ''}
         <span class="media-thumb__n">${i + 1}</span>
         ${m.type === 'video' ? `<span class="media-thumb__type">${icon('play')}</span>` : ''}`,
@@ -1147,12 +1202,16 @@
     /* o rascunho vive no estado do app: sobrevive a um re-render sem perder
        o que já foi digitado */
     const draft = (st.draft && st.draft.__for === chave) ? st.draft : Object.assign({ __for: chave }, editing ? structuredClone(editing) : {
-      id: null, code: '—', network: 'instagram', adPlatform: 'instagram', format: 'single',
+      id: null, code: '—', networks: ['instagram'], sponsored: false, format: 'single',
       title: '', media: [], captions: [{ id: uid('cap'), label: 'Opção A', text: '', author: St().me().id, createdAt: new Date().toISOString() }],
       chosenCaption: null, firstComment: '', link: '', status: 'rascunho', priority: 'normal',
       tags: [], scheduledAt: null, note: '',
+      approvers: St().get().users.filter((u) => u.role === 'approver').map((u) => u.id),
       ad: { objective: 'Geração de leads', audience: '', budget: 5000, period: '', headline: '', description: '', domain: 'bracerumpark.com', cta: 'Saiba mais' },
     });
+    if (!draft.networks?.length) draft.networks = ['instagram'];
+    if (!draft.ad) draft.ad = { objective: 'Geração de leads', audience: '', budget: 5000, period: '', headline: '', description: '', domain: 'bracerumpark.com', cta: 'Saiba mais' };
+    if (!draft.approvers) draft.approvers = (draft.levels || []).map((l) => l.approverId);
     st.draft = draft;
 
     const root = el('div', { class: 'view__inner view-enter' });
@@ -1171,9 +1230,21 @@
     root.append(wrap);
 
     /* ------------------------------------------------------- preview -- */
-    let previewCtx = { context: 'feed', device: 'mobile', slide: 0 };
+    let previewCtx = { context: 'feed', device: 'mobile', slide: 0, net: draft.networks[0] };
     function refresh() {
+      if (!draft.networks.includes(previewCtx.net)) previewCtx.net = draft.networks[0];
       previewCol.replaceChildren();
+
+      if (draft.networks.length > 1) {
+        const sw = el('div', { class: 'net-switch', 'aria-label': 'Rede da pré-visualização' });
+        draft.networks.forEach((n) => sw.append(el('button', {
+          class: n === previewCtx.net ? 'is-on' : '', style: `--nc:var(--net-${n})`,
+          html: `${icon(S().NETWORKS[n].icon)}<span>${esc(S().NETWORKS[n].name)}</span>`,
+          onclick: () => { previewCtx.net = n; refresh(); },
+        })));
+        previewCol.append(sw);
+      }
+
       const bar = el('div', { class: 'row row--tight', style: 'flex-wrap:wrap;justify-content:center' });
       bar.append(global.UI.segmented([
         { id: 'feed', label: 'Feed', icon: 'list' }, { id: 'profile', label: 'Perfil', icon: 'grid' },
@@ -1183,60 +1254,74 @@
       ], previewCtx.device, (id) => { previewCtx.device = id; refresh(); }, { name: 'Dispositivo' }));
       previewCol.append(bar);
 
-      const node = global.Preview.render(draft, {
+      previewCol.append(global.Preview.render(draft, {
         ...previewCtx, mode: St().settings().previewMode,
         slide: Math.min(previewCtx.slide, Math.max(0, draft.media.length - 1)),
-      });
-      global.U.on(node, 'click', '[data-slide]', (e, t) => {
-        e.stopPropagation();
-        previewCtx.slide = Math.max(0, Math.min(draft.media.length - 1, previewCtx.slide + Number(t.dataset.slide)));
-        refresh();
-      });
-      previewCol.append(node);
+        onSlide: (i) => { previewCtx.slide = i; },
+      }));
       previewCol.append(el('p', { class: 'ctx-note', html: `${icon('eye')}Simulação de layout.` }));
     }
     const refreshSoon = debounce(refresh, 220);
 
-    /* ------------------------------------------------------- 1. rede --- */
-    const secRede = painel('Rede e formato', 'target');
+    /* ------------------------------------------------------- 1. redes -- */
+    const secRede = painel('Redes e formato', 'target');
+    secRede.body.append(el('p', { class: 'hint', text: 'Marque quantas redes quiser: a mesma peça vai para todas, com uma aprovação só. A pré-visualização mostra cada rede separadamente.' }));
+
     const picker = el('div', { class: 'picker' });
     Object.values(S().NETWORKS).forEach((n) => {
-      const b = el('button', {
-        class: 'pick' + (draft.network === n.id ? ' is-on' : ''),
-        'data-net': n.id === 'ads' ? 'ads' : n.id,
-        html: `<span class="pick__ic">${icon(n.icon)}</span><span class="pick__n">${esc(n.name)}</span>
-          <span class="pick__d">${n.id === 'ads' ? 'peça paga' : '@' + esc(global.Store.get().brand.handles[n.id] || n.name)}</span>`,
+      const on = draft.networks.includes(n.id);
+      picker.append(el('button', {
+        class: 'pick pick--multi' + (on ? ' is-on' : ''), 'data-net': n.id,
+        'aria-pressed': on ? 'true' : 'false',
+        html: `<span class="pick__check">${on ? icon('check') : ''}</span>
+          <span class="pick__ic">${icon(n.icon)}</span><span class="pick__n">${esc(n.name)}</span>
+          <span class="pick__d">@${esc(global.Store.get().brand.handles[n.id] || n.name)}</span>`,
         onclick: () => {
-          draft.network = n.id;
-          if (!n.formats.includes(draft.format)) draft.format = n.formats[0];
+          if (on && draft.networks.length === 1) {
+            return global.UI.toast('A peça precisa de ao menos uma rede.', 'warn');
+          }
+          draft.networks = on ? draft.networks.filter((x) => x !== n.id) : [...draft.networks, n.id];
+          /* mantém a ordem do catálogo, para o preview não pular de lugar */
+          draft.networks.sort((a, b) => S().NET_IDS.indexOf(a) - S().NET_IDS.indexOf(b));
+          if (!formatosComuns().includes(draft.format)) draft.format = formatosComuns()[0];
           rebuild();
         },
-      });
-      picker.append(b);
+      }));
     });
     secRede.body.append(picker);
 
-    if (draft.network === 'ads') {
-      const sel = el('div', { class: 'field' });
-      sel.append(el('label', { class: 'label', text: 'Veicular em' }));
-      const seg = global.UI.segmented(
-        ['instagram', 'facebook', 'linkedin'].map((k) => ({ id: k, label: S().NETWORKS[k].name, icon: S().NETWORKS[k].icon })),
-        draft.adPlatform || 'instagram', (id) => { draft.adPlatform = id; refresh(); }, { brand: true, name: 'Plataforma' });
-      sel.append(seg);
-      secRede.body.append(sel);
-    }
+    /* mídia paga é uma marcação, não uma rede: pode impulsionar em todas */
+    const swPago = el('div', { class: 'row' });
+    swPago.append(el('span', {
+      class: 'stack stack--sm',
+      html: `<b class="row row--tight">${icon(S().SPONSOR.icon)}Peça patrocinada</b>
+             <span class="tiny dim">Abre os campos de objetivo, público, verba e botão. Vale para todas as redes marcadas.</span>`,
+    }));
+    swPago.append(el('span', { class: 'spacer' }));
+    const chk = el('label', { class: 'switch', html: `<input type="checkbox" ${draft.sponsored ? 'checked' : ''}><span class="switch__track"></span>` });
+    chk.querySelector('input').onchange = (e) => { draft.sponsored = e.target.checked; rebuild(); };
+    swPago.append(chk);
+    secRede.body.append(el('hr', { class: 'divider' }), swPago);
 
+    /* o formato tem de existir em todas as redes marcadas */
+    const comuns = formatosComuns();
     const fmts = el('div', { class: 'picker' });
-    S().NETWORKS[draft.network].formats.forEach((fid) => {
+    comuns.forEach((fid) => {
       const f = S().FORMATS[fid];
       fmts.append(el('button', {
         class: 'pick' + (draft.format === fid ? ' is-on' : ''),
         html: `<span class="pick__ic">${icon(f.icon)}</span><span class="pick__n">${esc(f.name)}</span>
-          <span class="pick__d">${esc(proporcao(f.ratio[draft.network === 'ads' ? (draft.adPlatform || 'instagram') : draft.network]))}</span>`,
+          <span class="pick__d">${draft.networks.map((n) => proporcao(f.ratio[n])).filter((v, i, a) => a.indexOf(v) === i).join(' · ')}</span>`,
         onclick: () => { draft.format = fid; rebuild(); },
       }));
     });
-    secRede.body.append(el('label', { class: 'label', text: 'Formato' }), fmts);
+    secRede.body.append(el('hr', { class: 'divider' }), el('label', { class: 'label', text: 'Formato' }), fmts);
+    if (draft.networks.length > 1) {
+      secRede.body.append(el('p', {
+        class: 'hint',
+        text: `Só aparecem os formatos que existem em ${draft.networks.map((n) => S().NETWORKS[n].name).join(', ')}. Reels e Story são exclusivos do Instagram.`,
+      }));
+    }
     form.append(secRede.panel);
 
     /* ------------------------------------------------------ 2. mídias -- */
@@ -1337,7 +1422,7 @@
       const head = el('div', { class: 'row row--tight' });
       head.append(el('span', { class: 'label', text: c.label }));
       head.append(el('span', { class: 'spacer' }));
-      const cnt = el('span', { class: 'row row--tight', html: global.UI.counter(c.text, draft.network) });
+      const cnt = el('span', { class: 'row row--tight', html: global.UI.counter(c.text, draft.networks) });
       head.append(cnt);
       if (draft.captions.length > 1) head.append(el('button', {
         class: 'btn btn--ghost btn--sm', html: icon('trash'), title: 'Remover variação',
@@ -1349,7 +1434,7 @@
       });
       ta.addEventListener('input', () => {
         c.text = ta.value;
-        cnt.innerHTML = global.UI.counter(c.text, draft.network);
+        cnt.innerHTML = global.UI.counter(c.text, draft.networks);
         refreshSoon();
       });
       f.append(head, ta);
@@ -1363,7 +1448,7 @@
       },
     }));
 
-    if (S().NETWORKS[draft.network].firstComment) {
+    if (draft.networks.some((n) => S().NETWORKS[n].firstComment)) {
       const f = el('div', { class: 'field' });
       f.append(el('label', { class: 'label', text: 'Primeiro comentário (hashtags)' }));
       const ta = el('textarea', { class: 'textarea', style: 'min-height:64px', text: draft.firstComment, placeholder: '#BracerumPark #Villeta…' });
@@ -1374,7 +1459,7 @@
     form.append(secCap.panel);
 
     /* ----------------------------------------------- 4. mídia paga ----- */
-    if (draft.network === 'ads') {
+    if (draft.sponsored) {
       const secAd = painel('Mídia paga', 'megaphone');
       const g = el('div', { class: 'stack' });
       g.append(campo('Objetivo', selectDe(S().OBJECTIVES, draft.ad.objective, (v) => { draft.ad.objective = v; })));
@@ -1405,6 +1490,30 @@
     secOrg.body.append(linha);
     secOrg.body.append(campo('Etiquetas (separadas por vírgula)', inputDe((draft.tags || []).join(', '), 'Institucional, Obras', (v) => { draft.tags = v.split(',').map((x) => x.trim()).filter(Boolean); })));
     secOrg.body.append(campo('Link', inputDe(draft.link, 'https://…', (v) => { draft.link = v; })));
+    /* quem assina esta peça */
+    const aprovF = el('div', { class: 'field' });
+    aprovF.append(el('label', { class: 'label', text: 'Quem precisa aprovar' }));
+    const aprovRow = el('div', { class: 'row row--wrap' });
+    St().get().users.filter((u) => u.role === 'approver').forEach((u) => {
+      const on = draft.approvers.includes(u.id);
+      aprovRow.append(el('button', {
+        class: 'pill' + (on ? ' is-on' : ''), 'aria-pressed': on ? 'true' : 'false',
+        html: `${global.UI.avatarHTML(u, 'xs')}${esc(u.name)}`,
+        onclick: () => {
+          if (on && draft.approvers.length === 1) return global.UI.toast('Escolha ao menos um aprovador.', 'warn');
+          draft.approvers = on ? draft.approvers.filter((x) => x !== u.id) : [...draft.approvers, u.id];
+          rebuild();
+        },
+      }));
+    });
+    aprovF.append(aprovRow, el('span', {
+      class: 'hint',
+      text: St().settings().approvalMode === 'qualquer'
+        ? 'Basta um deles aprovar (definido em Ajustes).'
+        : 'Todos precisam aprovar (definido em Ajustes).',
+    }));
+    secOrg.body.append(aprovF);
+
     const notaF = el('div', { class: 'field' });
     notaF.append(el('label', { class: 'label', text: 'Recado para quem vai aprovar' }));
     const notaTa = el('textarea', { class: 'textarea', style: 'min-height:74px', text: draft.note, placeholder: 'O que você precisa que ele olhe com atenção?' });
@@ -1423,6 +1532,8 @@
       }
       const limpo = { ...draft };
       delete limpo.__for; delete limpo.__libOpen;
+      if (!limpo.sponsored) limpo.ad = null;
+      if (!editing) limpo.levels = St().defaultLevels(limpo.approvers);
       let id;
       if (editing) { St().updatePost(editing.id, limpo); id = editing.id; }
       else { id = St().createPost({ ...limpo, id: undefined, code: undefined }).id; }
@@ -1464,6 +1575,12 @@
     }
     function rebuild() { global.App.render(); }
     function proporcao(r) { return ({ '1': '1:1', '1.91': '1,91:1' })[r] || r || ''; }
+    /** Formatos que existem em todas as redes marcadas. */
+    function formatosComuns() {
+      const listas = draft.networks.map((n) => S().NETWORKS[n].formats);
+      const inter = listas.reduce((a, b) => a.filter((f) => b.includes(f)), listas[0] || []);
+      return inter.length ? inter : ['single'];
+    }
   };
 
   /* ==========================================================================
@@ -1481,9 +1598,17 @@
 
     /* fluxo */
     const f = painelSimples('Fluxo de aprovação', 'target');
-    f.body.append(linhaSwitch('Aprovação em dois níveis',
-      'Revisão interna antes do aval do cliente. Vale para peças novas.',
-      s.requireTwoLevels, (v) => St().setSetting('requireTwoLevels', v)));
+    f.body.append(el('div', { class: 'row' }, [
+      el('span', {
+        class: 'stack stack--sm',
+        html: '<b>Quando a peça está aprovada</b><span class="tiny dim">Vale para as peças em revisão a partir de agora.</span>',
+      }),
+      el('span', { class: 'spacer' }),
+      global.UI.segmented([
+        { id: 'todos', label: 'Todos assinam', icon: 'users' },
+        { id: 'qualquer', label: 'Basta um', icon: 'user' },
+      ], s.approvalMode, (v) => St().setSetting('approvalMode', v), { brand: true, name: 'Modo de aprovação' }),
+    ]));
     f.body.append(linhaSwitch('Travar edição após aprovar',
       'Depois do aval, mudar a peça exige reabrir para edição — e isso fica no histórico.',
       s.lockApproved, (v) => St().setSetting('lockApproved', v)));

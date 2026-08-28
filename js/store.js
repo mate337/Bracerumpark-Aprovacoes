@@ -7,13 +7,13 @@
 (function (global) {
   'use strict';
   const { uid } = global.U;
-  const KEY = 'aprova.state.v1';
+  const KEY = 'aprova.state.v2';
 
   const DEFAULT_SETTINGS = {
     theme: 'dark',
     railCollapsed: false,
     previewMode: 'light',        // tema do preview da rede (light | dark)
-    requireTwoLevels: true,      // aprovação em dois níveis
+    approvalMode: 'todos',       // 'todos' = todo aprovador assina · 'qualquer' = o primeiro libera
     lockApproved: true,          // travar edição depois de aprovado
     notifyOnComment: true,
   };
@@ -93,18 +93,22 @@
   function pendingForMe() {
     const my = me();
     if (!my) return [];
-    return state.posts.filter((p) => {
-      if (p.status !== 'revisao') return false;
-      if (my.role === 'admin') return true;
-      const lvl = currentLevel(p);
-      return lvl && lvl.approverId === my.id;
-    });
+    return state.posts.filter((p) => canDecide(p, my.id) || (my.role === 'admin' && p.status === 'revisao'));
   }
 
-  /** O nível de aprovação que está aberto agora. */
+  /** O primeiro nível ainda aberto — usado para “aguardando fulano”. */
   function currentLevel(p) {
-    if (!p.levels) return null;
-    return p.levels.find((l) => l.status === 'pendente') || null;
+    return (p.levels || []).find((l) => l.status === 'pendente') || null;
+  }
+
+  /** O nível desta pessoa, se ela ainda não decidiu. */
+  function myLevel(p, userId = state.currentUserId) {
+    return (p.levels || []).find((l) => l.approverId === userId && l.status !== 'aprovado') || null;
+  }
+
+  /** Os níveis correm em paralelo: quem for aprovador pode decidir quando quiser. */
+  function canDecide(p, userId = state.currentUserId) {
+    return p.status === 'revisao' && !!myLevel(p, userId);
   }
 
   function counts() {
@@ -115,6 +119,12 @@
   }
 
   /* ----------------------------------------------------------- sessão --- */
+  /** Conta cadastrada com este e-mail (sem diferenciar maiúsculas). */
+  function userByEmail(email) {
+    const alvo = String(email || '').trim().toLowerCase();
+    return state.users.find((u) => u.email.toLowerCase() === alvo) || null;
+  }
+
   function login(userId) {
     state.currentUserId = userId;
     emit('login');
@@ -137,9 +147,9 @@
   function createPost(data) {
     const my = me();
     const p = {
-      id: uid('p'),
-      code: nextCode(),
-      network: 'instagram',
+      networks: ['instagram'],
+      sponsored: false,
+      ad: null,
       format: 'single',
       title: 'Nova postagem',
       media: [],
@@ -155,23 +165,24 @@
       createdBy: my?.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      levels: defaultLevels(my?.id),
+      levels: defaultLevels(data?.approvers),
       activity: [{ id: uid('a'), kind: 'system', authorId: my?.id, at: new Date().toISOString(), text: 'criou a postagem' }],
       ...data,
     };
+    /* depois do spread: um `code: undefined` vindo do compositor não pode
+       apagar o código da peça, e o contador só anda quando é realmente novo */
+    p.id = p.id || uid('p');
+    p.code = p.code || nextCode();
     state.posts.unshift(p);
     emit('post:create', { postId: p.id });
     return p;
   }
 
   /** Revisão interna é revisão de par: quem criou não revisa a si mesmo. */
-  function defaultLevels(creatorId = state.currentUserId) {
-    const approver = state.users.find((u) => u.role === 'approver');
-    const admins = state.users.filter((u) => u.role === 'admin');
-    const admin = admins.find((u) => u.id !== creatorId) || admins[0];
-    const levels = [{ name: 'Revisão interna', approverId: admin?.id, status: 'pendente', at: null }];
-    if (state.settings.requireTwoLevels) levels.push({ name: 'Aprovação do cliente', approverId: approver?.id, status: 'pendente', at: null });
-    return levels;
+  /** Uma trilha de aprovação a partir dos aprovadores escolhidos. */
+  function defaultLevels(approverIds) {
+    const ids = (approverIds?.length ? approverIds : state.users.filter((u) => u.role === 'approver').map((u) => u.id));
+    return ids.map((id) => ({ name: 'Aprovação', approverId: id, status: 'pendente', at: null }));
   }
 
   function updatePost(id, patch, reason = 'post:update') {
@@ -199,7 +210,7 @@
     copy.status = 'rascunho';
     copy.scheduledAt = null;
     copy.createdAt = copy.updatedAt = new Date().toISOString();
-    copy.levels = defaultLevels(state.currentUserId);
+    copy.levels = defaultLevels(src.levels?.map((l) => l.approverId));
     copy.activity = [{ id: uid('a'), kind: 'system', authorId: state.currentUserId, at: new Date().toISOString(), text: `duplicou de ${src.code}` }];
     copy.metrics = undefined;
     state.posts.unshift(copy);
@@ -355,9 +366,14 @@
     const p = post(id);
     const my = me();
     if (!p || !my) return;
-    const lvl = currentLevel(p) || p.levels[p.levels.length - 1];
-    if (lvl) { lvl.status = 'aprovado'; lvl.at = new Date().toISOString(); lvl.approverId = my.id; }
-    p.activity.push({ id: uid('a'), kind: 'approve', authorId: my.id, at: new Date().toISOString(), text: note || 'aprovou esta postagem.' });
+    const agora = new Date().toISOString();
+    const lvl = myLevel(p, my.id) || currentLevel(p);
+    if (lvl) { lvl.status = 'aprovado'; lvl.at = agora; }
+    /* “basta um aprovar”: a assinatura de quem decidiu fecha os outros níveis */
+    if (state.settings.approvalMode === 'qualquer') {
+      p.levels.forEach((l) => { if (l.status !== 'aprovado') { l.status = 'aprovado'; l.at = agora; l.byProxy = my.id; } });
+    }
+    p.activity.push({ id: uid('a'), kind: 'approve', authorId: my.id, at: agora, text: note || 'aprovou esta postagem.' });
     const pend = p.levels.some((l) => l.status !== 'aprovado');
     p.status = pend ? 'revisao' : (p.scheduledAt ? 'agendado' : 'aprovado');
     p.updatedAt = new Date().toISOString();
@@ -369,8 +385,8 @@
     const p = post(id);
     const my = me();
     if (!p || !my) return;
-    const lvl = currentLevel(p) || p.levels[p.levels.length - 1];
-    if (lvl) { lvl.status = 'alteracoes'; lvl.at = new Date().toISOString(); lvl.approverId = my.id; }
+    const lvl = myLevel(p, my.id) || currentLevel(p) || p.levels[p.levels.length - 1];
+    if (lvl) { lvl.status = 'alteracoes'; lvl.at = new Date().toISOString(); }
     p.activity.push({ id: uid('a'), kind: 'change', authorId: my.id, at: new Date().toISOString(), text: text || 'solicitou alterações.', resolved: false, replies: [] });
     p.status = 'alteracoes';
     p.updatedAt = new Date().toISOString();
@@ -435,7 +451,8 @@
   }
 
   global.Store = {
-    get, settings, me, user, post, isAdmin, visiblePosts, counts, unreadCount, pendingForMe, currentLevel,
+    get, settings, me, user, post, isAdmin, visiblePosts, counts, unreadCount, pendingForMe,
+    currentLevel, myLevel, canDecide, defaultLevels, userByEmail,
     login, logout, setSetting,
     createPost, updatePost, deletePost, duplicatePost, setStatus, submitForApproval, schedule,
     addMedia, removeMedia, reorderMedia,

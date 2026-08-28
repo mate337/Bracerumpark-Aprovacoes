@@ -17,7 +17,7 @@
        de cartões é a leitura natural */
     mode: matchMedia('(max-width: 900px)').matches ? 'grid' : 'board',
     filters: {}, query: '',
-    tab: 'legendas', context: 'feed', device: 'mobile', slide: 0,
+    tab: 'legendas', context: 'feed', device: 'mobile', slide: 0, net: null, expanded: false,
     arming: false, activePin: null, onlyOpen: true, calRef: null, draft: null,
   };
   App.state = { ...INICIAL };
@@ -50,7 +50,7 @@
     if (!shallow && patch.view) {
       historico.push({ ...App.state });
       // trocar de peça zera o estado local da tela
-      Object.assign(App.state, { slide: 0, arming: false, activePin: null, tab: 'legendas', context: 'feed' });
+      Object.assign(App.state, { slide: 0, net: null, expanded: false, arming: false, activePin: null, tab: 'legendas', context: 'feed' });
       if (patch.view !== 'compose') App.state.draft = null;
     }
     Object.assign(App.state, patch);
@@ -339,7 +339,7 @@
   function portao() {
     $('#app').hidden = true;
     if ($('#gate')) return;
-    const users = St().get().users;
+
     const gate = el('div', { id: 'gate', class: 'gate' });
     const box = el('div', { class: 'gate__box' });
 
@@ -347,31 +347,67 @@
     box.append(el('div', {
       class: 'stack stack--sm', html: `
       <h1 class="display grad-text">APROVA</h1>
-      <p class="muted" style="max-width:52ch;margin:0 auto">Aprovação de conteúdo para Instagram, Facebook, LinkedIn e mídia paga.
-      Escolha por qual perfil você quer entrar — o fluxo muda conforme o papel.</p>`,
+      <p class="muted" style="max-width:52ch;margin:0 auto">Aprovação de conteúdo para Instagram,
+      Facebook e LinkedIn. Entre com o e-mail cadastrado — o que você pode fazer depende do seu papel.</p>`,
     }));
 
-    const roles = el('div', { class: 'gate__roles stagger' });
-    [
-      { role: 'admin', titulo: 'Administrador', desc: 'Cria as peças, sobe mídia, escreve as opções de legenda e responde aos pedidos de ajuste.', tags: ['criar', 'editar', 'agendar'] },
-      { role: 'approver', titulo: 'Aprovador', desc: 'Vê a peça como ela vai aparecer no feed, escolhe a legenda, comenta no ponto e decide.', tags: ['revisar', 'comentar', 'aprovar'] },
-    ].forEach((r, i) => {
-      const u = users.find((x) => x.role === r.role);
-      const card = el('button', {
-        class: 'role-card', style: `--i:${i}`,
-        html: `${global.UI.avatarHTML(u, 'xl')}
-          <span class="role-card__n">${esc(r.titulo)}</span>
-          <span class="tiny dim">${esc(u.name)} · ${esc(u.title)}</span>
-          <span class="role-card__d">${esc(r.desc)}</span>
-          <span class="role-card__tags">${r.tags.map((t) => `<span class="chip chip--sm">${esc(t)}</span>`).join('')}</span>`,
-        onclick: () => entrar(u.id, gate),
-      });
-      roles.append(card);
+    const form = el('form', { class: 'gate__form', novalidate: true });
+    const campo = el('div', { class: 'field' });
+    campo.append(el('label', { class: 'label', for: 'gate-email', text: 'E-mail' }));
+    const input = el('input', {
+      class: 'input input--lg', id: 'gate-email', type: 'email', name: 'email',
+      placeholder: 'voce@empresa.com', autocomplete: 'email', autocapitalize: 'off', spellcheck: 'false',
+      'aria-describedby': 'gate-erro',
     });
-    box.append(roles);
-    box.append(el('p', { class: 'tiny dim', text: 'Demonstração local — os dados ficam neste navegador. Dá para trocar de perfil a qualquer momento pelo rodapé do menu.' }));
+    campo.append(input);
+    const erro = el('p', { class: 'gate__erro', id: 'gate-erro', role: 'alert', hidden: true });
+    campo.append(erro);
+    form.append(campo);
+    form.append(el('button', { class: 'btn btn--primary btn--lg btn--block', type: 'submit', html: `${icon('arrowR')}Entrar` }));
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const valor = input.value.trim();
+      if (!valor) { return falhar('Digite o seu e-mail.'); }
+      const u = St().userByEmail(valor);
+      if (!u) return falhar('Este e-mail não está cadastrado. Fale com o administrador.');
+      erro.hidden = true;
+      entrar(u.id, gate);
+    });
+    input.addEventListener('input', () => { erro.hidden = true; input.classList.remove('is-erro'); });
+
+    function falhar(msg) {
+      erro.textContent = msg;
+      erro.hidden = false;
+      input.classList.add('is-erro');
+      input.focus();
+      global.U.animate(form, [
+        { transform: 'translateX(0)' }, { transform: 'translateX(-7px)' },
+        { transform: 'translateX(6px)' }, { transform: 'translateX(0)' },
+      ], { duration: 260 });
+    }
+    box.append(form);
+
+    /* Sem senha: isto identifica quem está revisando, não autentica ninguém.
+       Como o acesso é por e-mail cadastrado, as contas ficam à vista — é uma
+       ferramenta interna rodando no navegador de quem abre. */
+    const contas = el('div', { class: 'gate__contas' });
+    contas.append(el('span', { class: 'eyebrow', text: 'Contas cadastradas' }));
+    const linha = el('div', { class: 'row row--wrap', style: 'justify-content:center' });
+    St().get().users.forEach((u) => linha.append(el('button', {
+      class: 'pill', type: 'button', title: `Entrar como ${u.name}`,
+      html: `${global.UI.avatarHTML(u, 'xs')}${esc(u.email)}<span class="pill__n">${u.role === 'admin' ? 'adm' : 'aprovador'}</span>`,
+      onclick: () => { input.value = u.email; erro.hidden = true; form.requestSubmit(); },
+    })));
+    contas.append(linha);
+    box.append(contas);
+
+    box.append(el('p', { class: 'tiny dim', style: 'max-width:56ch',
+      text: 'Acesso sem senha: o e-mail identifica quem está revisando, não autentica. Os dados ficam neste navegador.' }));
+
     gate.append(box);
     document.body.append(gate);
+    setTimeout(() => input.focus(), 120);
   }
 
   function entrar(userId, gate) {
@@ -382,13 +418,13 @@
   function trocarPerfil() {
     const users = St().get().users;
     global.UI.modal({
-      title: 'Trocar de perfil', icon: 'users',
+      title: 'Trocar de conta', icon: 'users',
       build: (b) => {
-        b.append(el('p', { class: 'hint', text: 'Nesta demonstração você pode ver o mesmo fluxo pelos dois lados.' }));
+        b.append(el('p', { class: 'hint', text: 'As contas cadastradas nesta instalação.' }));
         users.forEach((u) => b.append(el('button', {
           class: 'who', html: `${global.UI.avatarHTML(u, 'md')}
             <span class="who__txt"><span class="who__name">${esc(u.name)}</span>
-            <span class="who__role">${u.role === 'admin' ? 'Administrador' : 'Aprovador'} · ${esc(u.title)}</span></span>
+            <span class="who__role">${esc(u.email)} · ${u.role === 'admin' ? 'Administrador' : 'Aprovador'}</span></span>
             ${u.id === St().me()?.id ? icon('check') : ''}`,
           onclick: () => {
             St().login(u.id);
@@ -413,7 +449,7 @@
   App.exportPost = (p) => { baixar(`${p.code}.json`, JSON.stringify(p, null, 2)); global.UI.toast(`${p.code} exportada.`, 'ok'); };
   App.copySummary = () => {
     const linhas = St().visiblePosts().map((p) =>
-      `${p.code}\t${S().NETWORKS[p.network].name}\t${S().FORMATS[p.format].name}\t${S().STATUSES[p.status].short}\t${p.scheduledAt ? fmtDate(p.scheduledAt, 'full') : '—'}\t${p.title}`);
+      `${p.code}\t${(p.networks || []).map((n) => S().NETWORKS[n].name).join(' + ')}${p.sponsored ? ' (patrocinado)' : ''}\t${S().FORMATS[p.format].name}\t${S().STATUSES[p.status].short}\t${p.scheduledAt ? fmtDate(p.scheduledAt, 'full') : '—'}\t${p.title}`);
     navigator.clipboard?.writeText(['Código\tRede\tFormato\tEstado\tAgenda\tTítulo', ...linhas].join('\n'));
     global.UI.toast('Resumo copiado — cole na planilha.', 'ok');
   };

@@ -1,8 +1,8 @@
 # APROVA — aprovação de mídias sociais
 
 Aplicativo web para o ciclo **criar → revisar → aprovar → agendar** de postagens de
-Instagram, Facebook, LinkedIn e mídia paga. Roda sem servidor, sem build e sem
-dependência externa.
+Instagram, Facebook e LinkedIn, com ou sem impulsionamento. Roda sem servidor, sem
+build e sem dependência externa.
 
 Os dados ficam no `localStorage` do navegador. Nada sai do dispositivo.
 
@@ -23,13 +23,30 @@ projeto é estático, não precisa de build.
 
 ---
 
+## Entrar
+
+O acesso é por **e-mail cadastrado**. As contas desta instalação estão em
+`js/seed.js` (`USERS`):
+
+| E-mail | Papel |
+|---|---|
+| `matheus337.martins@gmail.com` | Administrador |
+| `sydney@bracerum.com` | Aprovador |
+| `cleber@bracerum.com` | Aprovador |
+
+**Não há senha.** O e-mail diz *quem* está revisando, para assinar as decisões e
+os comentários — ele não autentica ninguém, e qualquer pessoa com o link e um
+e-mail da lista entra. Para uso fora de uma equipe de confiança, o passo é o
+mesmo já citado nos limites: uma API com autenticação de verdade.
+
+Para mudar a lista, edite `USERS` em `js/seed.js` e, no navegador, use
+**Ajustes → Restaurar demonstração** (o estado guardado tem uma cópia das contas).
+
 ## Os dois lados
 
-Ao entrar você escolhe o perfil. O fluxo muda conforme o papel:
-
-| | **Administrador** (Ana, Caio) | **Aprovador** (Marta, Paulo) |
+| | **Administrador** | **Aprovador** |
 |---|---|---|
-| Cria peças, sobe mídia | ✓ | — |
+| Cria peças, escolhe as redes, sobe mídia | ✓ | — |
 | Escreve variações de legenda | ✓ | sugere redação |
 | Vê rascunhos | ✓ | — |
 | Escolhe a legenda que vai ao ar | ✓ | ✓ |
@@ -38,8 +55,21 @@ Ao entrar você escolhe o perfil. O fluxo muda conforme o papel:
 | Aprova / pede alterações | quando é seu nível | ✓ |
 | Arrasta no quadro e no calendário | ✓ | — |
 
-Dá para trocar de perfil a qualquer momento no rodapé do menu — é o jeito de ver
-a mesma peça pelos dois lados.
+Dá para trocar de conta pelo rodapé do menu — é o jeito de ver a mesma peça pelos
+dois lados.
+
+## Uma peça, várias redes
+
+No compositor você marca **quantas redes quiser**: a mesma publicação vai para
+Instagram, Facebook e LinkedIn com **uma aprovação só**. A pré-visualização traz um
+seletor para ver cada rede separadamente, e a lista de formatos mostra apenas o que
+existe em todas as redes marcadas — Reels e Story, por exemplo, só aparecem quando
+o Instagram está sozinho. Os contadores de caractere e hashtag passam a valer pelo
+**limite mais apertado** entre as redes escolhidas, e dizem qual delas aperta.
+
+**Patrocinado** deixou de ser uma rede e virou uma marcação da peça: uma chave que
+abre objetivo, público, verba, período, título, descrição e CTA — e vale para todas
+as redes marcadas.
 
 ## O fluxo
 
@@ -47,31 +77,37 @@ a mesma peça pelos dois lados.
 Rascunho → Em revisão → (Alterações solicitadas ⟲) → Aprovado → Agendado → Publicado
 ```
 
-A revisão acontece em **níveis**. Por padrão são dois: *revisão interna* (outro
-administrador — quem cria não revisa a si mesmo) e *aprovação do cliente*. Só
-quando todos os níveis estão verdes a peça vira "Aprovado". Isso liga/desliga em
-**Ajustes → Aprovação em dois níveis**.
+Ao criar a peça o administrador escolhe **quem precisa aprovar**. Os níveis correm
+em paralelo: cada aprovador decide quando quiser, sem esperar a vez. Em
+**Ajustes → Fluxo de aprovação** você define quando a peça está aprovada:
+
+- **Todos assinam** — a peça só fica aprovada quando todos os escolhidos aprovarem.
+- **Basta um** — a primeira aprovação libera a peça e fecha os outros níveis.
 
 ## A tela de aprovação
 
 O centro do produto. À esquerda, a peça renderizada como vai aparecer:
 
-- **Contexto:** `Feed` (o post na timeline, com os posts vizinhos) ou `Perfil`
+- **Rede:** quando a peça vai para mais de uma, um seletor troca qual está sendo
+  revisada — a mesma legenda dentro da moldura de cada plataforma.
+- **Contexto:** `Feed` (o post na timeline) ou `Perfil`
   (a grade do Instagram, a página do Facebook/LinkedIn — para julgar o conjunto,
   não só a peça isolada).
 - **Dispositivo:** `Mobile` (moldura de celular, 390×844) ou `Desktop` (janela de
   navegador com as colunas reais de cada rede).
 - **Tema da rede:** claro ou escuro, porque o feed do leitor pode ser qualquer um.
 
-Os cortes de legenda são os reais: ~125 caracteres no Instagram, ~280 no Facebook,
-~210 no LinkedIn, com o "… mais" no lugar certo. Carrossel tem setas, contador e
-pontinhos. Vídeo tem play, duração e ícone de som. Anúncio ganha o cartão de CTA
-da rede e o rótulo "Patrocinado"/"Promovido".
+**A moldura é funcional, não uma imagem.** O carrossel anda de verdade: setas,
+pontinhos clicáveis, contador, e arrasto lateral no dedo ou no mouse. O "… mais"
+abre a legenda inteira ali dentro (e "menos" fecha). Os cortes são os reais —
+~125 caracteres no Instagram, ~280 no Facebook, ~210 no LinkedIn. Vídeo tem play,
+duração e ícone de som. Peça patrocinada ganha o cartão de CTA da rede e o rótulo
+"Patrocinado"/"Promovido".
 
 À direita, quatro abas:
 
 - **Legendas** — as variações lado a lado, cada uma com contador de caracteres e
-  de hashtags no limite da rede. O aprovador clica na que prefere; a escolha fica
+  de hashtags no limite mais apertado entre as redes da peça. O aprovador clica na que prefere; a escolha fica
   registrada com nome e horário. Também pode **sugerir uma redação** — o texto vai
   como sugestão e o criador decide se aplica (um clique aplica).
 - **Conversa** — comentários, pedidos de ajuste e notas internas. Cada item traz
@@ -89,17 +125,18 @@ qualquer tela, e o comentário guarda em qual imagem do carrossel foi feito.
 ## Outras telas
 
 - **Painel** — o que espera por você, o funil por estado, a atividade da equipe e
-  as próximas publicações.
+  as próximas publicações. Numa instalação nova ele convida a criar a primeira peça.
 - **Postagens** — três leituras dos mesmos dados: **Quadro** (kanban, arrastável
   para mudar de estado), **Grade** e **Lista**. Filtros por rede, por estado e
   "só o que espera por mim".
 - **Calendário** — mês inteiro; arraste uma peça de um dia para outro para
   reagendar.
-- **Compositor** — rede, formato, mídias (arrastar-e-soltar, acervo do projeto,
-  reordenação do carrossel), variações de legenda, primeiro comentário, campos de
-  anúncio, agenda, etiquetas e um recado para quem vai aprovar. A pré-visualização
+- **Compositor** — redes (uma ou várias), chave de patrocinado, formato, mídias
+  (arrastar-e-soltar, acervo do projeto, reordenação do carrossel), variações de
+  legenda, primeiro comentário, campos de anúncio, quem precisa aprovar, agenda,
+  etiquetas e um recado para quem vai aprovar. A pré-visualização
   ao lado acompanha o que você digita.
-- **Ajustes** — níveis de aprovação, temas, pessoas, exportação e restauração.
+- **Ajustes** — modo de aprovação, temas, contas, exportação e restauração.
 
 ## Atalhos
 
@@ -155,7 +192,11 @@ navegação no celular para o polegar alcançar.
 - **Não publica.** O agendamento registra o compromisso combinado; a publicação
   em si continua na ferramenta de postagem.
 - **Dados locais.** Sem servidor, cada navegador tem a sua cópia — não há
-  colaboração entre máquinas. É o passo natural seguinte: uma API e autenticação
-  de verdade, com link de convidado para o aprovador (sem exigir conta).
+  colaboração entre máquinas, e o e-mail identifica sem autenticar. É o passo
+  natural seguinte: uma API e autenticação de verdade, com link de convidado
+  para o aprovador (sem exigir conta).
+- **A ferramenta começa vazia.** Não há conteúdo de demonstração: as peças são as
+  que a equipe criar. O acervo de renders do parque continua disponível no
+  compositor.
 - Mídia enviada é reduzida para caber no `localStorage`; vídeos grandes podem
   estourar a cota (o app avisa).

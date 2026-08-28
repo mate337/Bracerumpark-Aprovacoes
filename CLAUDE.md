@@ -60,6 +60,27 @@ js/app.js        roteador por hash, navegação, atalhos, paleta de comandos
 - Em grades CSS use `minmax(0, 1fr)` nas linhas/colunas que precisam encolher —
   `auto` mede o conteúdo e estoura o painel (foi a origem de vários defeitos).
 
+## Decisões que já foram tomadas
+
+- **Uma peça vai para N redes** (`post.networks: []`), com uma aprovação só. Não
+  existe `post.network` no singular — o preview desenha uma rede por vez via
+  `Preview.render(p, { net })`.
+- **Patrocinado é `post.sponsored`**, uma marcação da peça, não uma rede.
+- **Aprovação em paralelo**: `post.levels` sai dos aprovadores escolhidos no
+  compositor; `settings.approvalMode` (`'todos'` | `'qualquer'`) decide quando a
+  peça fica aprovada. Use `Store.canDecide(p)` / `Store.myLevel(p)` — nunca
+  compare `currentLevel().approverId` na mão.
+- **Acesso por e-mail cadastrado** (`Store.userByEmail`), sem senha. Isso
+  identifica, não autentica — não escreva nada que sugira o contrário.
+- **Sem massa de demonstração**: `SEED.POSTS` é `[]` de propósito. As telas
+  precisam ter estado vazio decente.
+- O preview é **auto-suficiente**: `previews.js` liga o carrossel (setas, pontos,
+  arrasto) e o “ver mais” no próprio nó, e avisa quem chamou por `onSlide` /
+  `onExpand`. Não religue esses eventos de fora — foi assim que o carrossel
+  funcionou no compositor sem código novo.
+- `.pin-layer` fica com `pointer-events: none` e só recebe clique quando armada.
+  Sem isso ela cobre a mídia e engole as setas do carrossel.
+
 ## Idioma
 
 Interface e código em **português do Brasil**, incluindo nomes de funções internas

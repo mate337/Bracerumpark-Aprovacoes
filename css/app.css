@@ -925,6 +925,12 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 }
 .gate__mark svg { width: 32px; height: 32px; }
 @keyframes markIn { from { opacity: 0; transform: scale(.6) rotate(-14deg); } to { opacity: 1; transform: none; } }
+.gate__form { display: grid; gap: var(--s-4); width: min(400px, 100%); text-align: left; }
+.input--lg { min-height: 52px; font-size: 1rem; padding: 12px var(--s-4); border-radius: var(--r-md); text-align: center; }
+.input.is-erro { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(242,85,90,.16); }
+.gate__erro { font-size: var(--t-xs); color: var(--danger); text-align: center; margin: 0; }
+.gate__contas { display: grid; gap: var(--s-3); justify-items: center; width: 100%; }
+.gate__contas .pill { font-family: var(--font-mono); font-size: var(--t-2xs); }
 .gate__roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--s-4); width: 100%; }
 .role-card {
   position: relative; overflow: hidden; display: grid; gap: var(--s-3); justify-items: center;
@@ -1032,8 +1038,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .card__foot .tiny + .tiny { display: none; }
   .card .net-badge { width: 22px; height: 22px; border-radius: 7px; }
   .card .net-badge svg { width: 12px; height: 12px; }
+  /* barra do palco em uma linha só: no celular o rótulo vira dica */
   .stage__bar .seg__btn span { display: none; }
   .stage__bar .seg__btn { padding: 0 10px; }
+  .btn--compact span { display: none; }
+  .btn--compact { width: 32px; padding: 0; }
   .topbar__title { display: none; }
   .cards { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
   .card__body { padding: var(--s-3); gap: var(--s-2); }
@@ -1071,3 +1080,16 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .toolbar .select { flex: 1 1 160px; width: auto; }
   .toolbar .spacer { display: none; }
 }
+
+/* seleção múltipla de redes no compositor */
+.pick--multi { padding-top: var(--s-5); }
+.pick__check {
+  position: absolute; top: 8px; left: 8px; width: 18px; height: 18px; border-radius: 6px;
+  display: grid; place-items: center; border: 1.5px solid var(--line-strong);
+  color: var(--txt-on-brand); transition: all var(--d-2) var(--e-spring);
+}
+.pick--multi.is-on .pick__check {
+  background: color-mix(in srgb, var(--nc, var(--brand)) 85%, white); border-color: transparent;
+}
+.pick__check svg { width: 12px; height: 12px; }
+.pill .av { margin-left: -2px; }
