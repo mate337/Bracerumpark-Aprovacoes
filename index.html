@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark light" />
+<meta name="theme-color" content="#0d0906" />
+<title>APROVA · Aprovação de mídias sociais</title>
+<meta name="description" content="Fluxo de aprovação de postagens para Instagram, Facebook, LinkedIn e mídia paga: pré-visualização fiel no feed e no perfil, comentários no ponto e decisão registrada." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700&family=Noto+Serif:ital@1&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="css/tokens.css" />
+<link rel="stylesheet" href="css/app.css" />
+<link rel="stylesheet" href="css/previews.css" />
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23ff6a1a'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11.5' stroke='%231a0a02' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+</head>
+<body>
+
+<!-- brilho de fundo -->
+<div class="atmos" aria-hidden="true">
+  <div class="atmos__glow atmos__glow--a"></div>
+  <div class="atmos__glow atmos__glow--b"></div>
+  <div class="atmos__grain"></div>
+</div>
+
+<div class="app" id="app" data-rail="expanded" hidden>
+  <aside class="rail" id="rail"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="view" id="view" tabindex="-1"></main>
+  </div>
+</div>
+
+<div class="toasts" role="status" aria-live="polite"></div>
+
+<noscript>
+  <div style="padding:40px;font-family:system-ui;color:#fdf6f0;background:#0d0906">
+    <h1>APROVA</h1><p>Este aplicativo precisa de JavaScript para funcionar.</p>
+  </div>
+</noscript>
+
+<script src="js/util.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/store.js"></script>
+<script src="js/previews.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/views.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

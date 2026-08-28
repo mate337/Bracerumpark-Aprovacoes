@@ -1,0 +1,149 @@
+/* ==========================================================================
+   APROVA — Design tokens
+   Sistema de aprovação de mídias sociais.
+   Paleta: preto profundo + laranja incandescente. Futurista, com degradês,
+   vidro (glass) e brilho volumétrico.
+   ========================================================================== */
+
+:root {
+  /* ---- Superfícies -------------------------------------------------- */
+  --bg-void: #070503;        /* fundo absoluto da página */
+  --bg-base: #0d0906;        /* fundo do app */
+  --bg-panel: #14100c;       /* painéis */
+  --bg-raised: #1c1611;      /* cartões elevados */
+  --bg-sunken: #0a0705;      /* poços, campos */
+  --bg-hover: #241c15;
+
+  --glass: rgba(255, 255, 255, 0.045);
+  --glass-strong: rgba(255, 255, 255, 0.075);
+  --glass-blur: 22px;
+
+  /* ---- Linhas ------------------------------------------------------- */
+  --line: rgba(255, 236, 220, 0.09);
+  --line-soft: rgba(255, 236, 220, 0.055);
+  --line-strong: rgba(255, 236, 220, 0.16);
+  --line-brand: rgba(255, 106, 26, 0.38);
+
+  /* ---- Texto -------------------------------------------------------- */
+  --txt: #fdf6f0;
+  --txt-2: rgba(253, 246, 240, 0.68);
+  --txt-3: rgba(253, 246, 240, 0.44);
+  --txt-4: rgba(253, 246, 240, 0.26);
+  --txt-on-brand: #1a0a02;
+
+  /* ---- Marca -------------------------------------------------------- */
+  --brand: #ff6a1a;
+  --brand-lift: #ff8a3d;
+  --brand-hot: #ffab63;
+  --brand-deep: #d2440a;
+  --brand-ink: #7a2606;
+  --brand-tint: rgba(255, 106, 26, 0.12);
+  --brand-tint-2: rgba(255, 106, 26, 0.22);
+
+  --grad-brand: linear-gradient(135deg, #ff8a3d 0%, #ff6a1a 45%, #d2440a 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(255, 138, 61, 0.22), rgba(210, 68, 10, 0.06));
+  --grad-panel: linear-gradient(168deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012) 42%, rgba(255, 255, 255, 0) 100%);
+  --grad-sheen: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.09) 50%, transparent 80%);
+
+  /* ---- Estados / semântica ------------------------------------------ */
+  --st-draft: #9b8f85;
+  --st-review: #ffb020;
+  --st-changes: #f2555a;
+  --st-approved: #2fd39a;
+  --st-scheduled: #6aa6ff;
+  --st-published: #b98cff;
+
+  --ok: #2fd39a;
+  --warn: #ffb020;
+  --danger: #f2555a;
+  --info: #6aa6ff;
+
+  /* ---- Redes -------------------------------------------------------- */
+  --net-instagram: #e1306c;
+  --net-facebook: #1877f2;
+  --net-linkedin: #0a66c2;
+  --net-ads: #ff6a1a;
+
+  /* ---- Raio --------------------------------------------------------- */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-2xl: 36px;
+  --r-pill: 999px;
+
+  /* ---- Espaço (escala 4) -------------------------------------------- */
+  --s-1: 4px;   --s-2: 8px;   --s-3: 12px;  --s-4: 16px;
+  --s-5: 20px;  --s-6: 24px;  --s-7: 32px;  --s-8: 40px;
+  --s-9: 48px;  --s-10: 64px; --s-11: 80px;
+
+  /* ---- Tipografia ---------------------------------------------------- */
+  --font: "Inter", "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Sora", var(--font);
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --t-display: clamp(2rem, 1.2rem + 2.6vw, 3.25rem);
+  --t-h1: clamp(1.5rem, 1.1rem + 1.4vw, 2.125rem);
+  --t-h2: clamp(1.175rem, 1rem + 0.6vw, 1.5rem);
+  --t-h3: 1.0625rem;
+  --t-body: 0.9375rem;
+  --t-sm: 0.8125rem;
+  --t-xs: 0.75rem;
+  --t-2xs: 0.6875rem;
+
+  /* ---- Elevação ------------------------------------------------------ */
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --sh-2: 0 6px 20px -6px rgba(0, 0, 0, 0.6);
+  --sh-3: 0 18px 48px -16px rgba(0, 0, 0, 0.72);
+  --sh-4: 0 36px 90px -28px rgba(0, 0, 0, 0.85);
+  --sh-brand: 0 12px 40px -12px rgba(255, 106, 26, 0.5);
+  --sh-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* ---- Movimento ----------------------------------------------------- */
+  --e-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --e-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --d-1: 120ms;
+  --d-2: 200ms;
+  --d-3: 320ms;
+  --d-4: 520ms;
+
+  /* ---- Layout -------------------------------------------------------- */
+  --rail: 264px;
+  --rail-collapsed: 76px;
+  --topbar: 64px;
+  --z-rail: 40;
+  --z-topbar: 45;
+  --z-sheet: 60;
+  --z-modal: 70;
+  --z-toast: 90;
+}
+
+/* Tema claro opcional — o app nasce escuro, mas o operador pode inverter
+   para revisar peças destinadas a feeds claros. */
+:root[data-theme="light"] {
+  --bg-void: #f4efe9;
+  --bg-base: #faf6f1;
+  --bg-panel: #ffffff;
+  --bg-raised: #ffffff;
+  --bg-sunken: #f2ece5;
+  --bg-hover: #f2ebe3;
+  --glass: rgba(20, 12, 6, 0.03);
+  --glass-strong: rgba(20, 12, 6, 0.05);
+  --line: rgba(28, 18, 10, 0.11);
+  --line-soft: rgba(28, 18, 10, 0.07);
+  --line-strong: rgba(28, 18, 10, 0.2);
+  --txt: #1a120b;
+  --txt-2: rgba(26, 18, 11, 0.7);
+  --txt-3: rgba(26, 18, 11, 0.5);
+  --txt-4: rgba(26, 18, 11, 0.3);
+  --grad-panel: linear-gradient(168deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.4));
+  --sh-2: 0 6px 20px -8px rgba(60, 30, 10, 0.18);
+  --sh-3: 0 18px 44px -18px rgba(60, 30, 10, 0.22);
+  --sh-4: 0 30px 70px -26px rgba(60, 30, 10, 0.26);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --d-1: 1ms; --d-2: 1ms; --d-3: 1ms; --d-4: 1ms; }
+}
