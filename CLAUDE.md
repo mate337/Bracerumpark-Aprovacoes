@@ -81,6 +81,24 @@ js/app.js        roteador por hash, navegação, atalhos, paleta de comandos
 - `.pin-layer` fica com `pointer-events: none` e só recebe clique quando armada.
   Sem isso ela cobre a mídia e engole as setas do carrossel.
 
+## Sincronização
+
+`js/cloud.js` fala com um projeto Supabase por REST (sem SDK, sem dependência).
+É **opcional**: `config.js` vazio = tudo em `localStorage`, como antes.
+
+- O recorte compartilhado é `Store.syncDoc()` — tudo menos `settings` e
+  `currentUserId`, que são preferências de cada pessoa.
+- `Store.mergeRemote(doc)` junta **por peça**, pela `updatedAt` mais recente.
+  Exclusões viram lápide em `state.deleted` para não ressuscitarem.
+- Toda `emit()` agenda um envio (`pushSoon`, 1,2 s de folga). Não chame `push`
+  direto de uma view.
+- Mídia enviada pelo usuário nasce como `data:` URL. `Store.migrarMidias()` sobe
+  para o Storage e troca o `src` — é o que resolve "a imagem só aparece para
+  mim" sem ninguém reenviar arquivo. O bucket precisa ser **público para
+  leitura**, senão o `<img>` não carrega (não dá para mandar header em `<img>`).
+- O SQL de instalação vive em `App.SQL_SUPABASE`, em `js/app.js`, e é o mesmo
+  texto que o botão "Copiar o SQL" entrega.
+
 ## Idioma
 
 Interface e código em **português do Brasil**, incluindo nomes de funções internas

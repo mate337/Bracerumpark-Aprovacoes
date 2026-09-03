@@ -1590,11 +1590,12 @@
     const root = el('div', { class: 'view__inner view-enter', style: 'max-width:860px' });
     const s = St().settings();
 
-    root.append(el('div', {
+    const cabeca = el('div', {
       class: 'page-head', html: `<div class="page-head__txt">
         <div class="eyebrow">Configuração</div><h1 class="h1">Ajustes</h1>
-        <p class="muted">Como o fluxo de aprovação se comporta.</p></div>`,
-    }));
+        <p class="muted">Onde os dados ficam e como o fluxo de aprovação se comporta.</p></div>`,
+    });
+    root.append(cabeca);
 
     /* fluxo */
     const f = painelSimples('Fluxo de aprovação', 'target');
@@ -1646,23 +1647,218 @@
     root.append(p.panel);
 
     /* dados */
-    const d = painelSimples('Dados', 'folder');
-    d.body.append(el('p', { class: 'hint', text: 'Tudo fica no navegador (localStorage). Nada sai deste dispositivo.' }));
+    /* --------------------------------------------- compartilhamento ---- */
+    const cloud = global.Cloud;
+    const ligado = cloud.isOn();
+    const sinc = painelSimples('Compartilhamento', ligado ? 'globe' : 'lock');
+    const locais = St().contarMidiaLocal();
+
+    sinc.body.append(el('div', {
+      class: 'verdict', 'data-status': ligado ? 'aprovado' : 'alteracoes', html: `
+      <span class="verdict__icon">${icon(ligado ? 'globe' : 'lock')}</span>
+      <span style="min-width:0">
+        <span class="h3" style="display:block">${ligado ? 'Sincronizado' : 'Somente neste navegador'}</span>
+        <span class="tiny dim">${ligado
+          ? esc(`${cloud.config().url.replace(/^https?:\/\//, '')} · equipe “${cloud.config().workspace}”`)
+          : 'O que você cria aqui não aparece para mais ninguém — nem para você em outro navegador ou em janela anônima.'}</span>
+      </span>`,
+    }));
+
+    if (!ligado) {
+      sinc.body.append(el('p', {
+        class: 'hint',
+        text: 'Para a equipe ver as mesmas postagens é preciso um lugar comum. O aplicativo fala com um projeto Supabase (plano gratuito), configurado uma vez.',
+      }));
+      sinc.body.append(el('div', { class: 'row row--wrap' }, [
+        el('button', { class: 'btn btn--primary', html: `${icon('globe')}Configurar compartilhamento`, onclick: () => configurarNuvem() }),
+        el('button', { class: 'btn', html: `${icon('copy')}Copiar o SQL da instalação`, onclick: () => copiarSQL() }),
+      ]));
+    } else {
+      const st = cloud.status();
+      sinc.body.append(el('dl', {
+        class: 'meta-grid', html: `
+        <dt>Última troca</dt><dd>${st.em ? esc(global.U.ago(st.em)) : '<span class="dim">ainda não</span>'}</dd>
+        <dt>Estado</dt><dd>${st.erro ? `<span style="color:var(--danger)">${esc(st.erro)}</span>` : 'tudo certo'}</dd>
+        <dt>Mídias locais</dt><dd>${locais ? `<b style="color:var(--warn)">${locais}</b> ainda só neste navegador` : 'nenhuma pendente'}</dd>`,
+      }));
+      const acoes = el('div', { class: 'row row--wrap' });
+      if (locais) {
+        acoes.append(el('button', {
+          class: 'btn btn--primary',
+          html: `${icon('upload')}Enviar ${global.U.plural(locais, 'mídia local', 'mídias locais')}`,
+          onclick: () => migrarMidias(),
+        }));
+      }
+      acoes.append(el('button', {
+        class: 'btn', html: `${icon('refresh')}Verificar agora`,
+        onclick: async () => {
+          try {
+            const r = await cloud.pull();
+            if (r) St().mergeRemote(r.doc);
+            global.UI.toast('Sincronizado.', 'ok');
+          } catch (e) { global.UI.toast('Falhou: ' + e.message, 'err', 6000); }
+        },
+      }));
+      acoes.append(el('button', {
+        class: 'btn btn--ghost', html: `${icon('settings')}Trocar configuração`, onclick: () => configurarNuvem(),
+      }));
+      sinc.body.append(acoes);
+    }
+    cabeca.after(sinc.panel);
+
+    /* --------------------------------------------------------- dados --- */
+    const d = painelSimples('Cópia dos dados', 'folder');
+    d.body.append(el('p', {
+      class: 'hint',
+      text: 'A cópia leva as postagens, os comentários e as imagens enviadas — dá para restaurar em outro navegador sem reenviar arquivo nenhum.',
+    }));
     d.body.append(el('div', { class: 'row row--wrap' }, [
-      el('button', { class: 'btn', html: `${icon('download')}Exportar plano (JSON)`, onclick: () => global.App.exportAll() }),
+      el('button', { class: 'btn btn--primary', html: `${icon('download')}Baixar cópia completa`, onclick: () => global.App.exportAll() }),
+      el('button', { class: 'btn', html: `${icon('upload')}Importar cópia`, onclick: () => importar() }),
       el('button', { class: 'btn', html: `${icon('copy')}Copiar resumo`, onclick: () => global.App.copySummary() }),
       el('button', {
-        class: 'btn btn--danger', html: `${icon('refresh')}Restaurar demonstração`,
+        class: 'btn btn--danger', html: `${icon('refresh')}Apagar tudo`,
         onclick: () => global.UI.confirm({
-          title: 'Restaurar dados de demonstração?', danger: true, ok: 'Restaurar',
-          text: 'Todas as postagens, comentários e decisões criados por você serão apagados.',
-          onOk: () => { St().reset(); global.UI.toast('Dados restaurados.', 'ok'); },
+          title: 'Apagar tudo deste navegador?', danger: true, ok: 'Apagar',
+          text: 'Postagens, comentários e decisões deste navegador serão apagados. Baixe uma cópia antes.',
+          onOk: () => { St().reset(); global.UI.toast('Dados apagados.', 'ok'); },
         }),
       }),
     ]));
-    root.append(d.panel);
+    sinc.panel.after(d.panel);
 
     return root;
+
+    function copiarSQL() {
+      navigator.clipboard?.writeText(global.App.SQL_SUPABASE);
+      global.UI.toast('SQL copiado — cole no SQL Editor do Supabase.', 'ok', 5000);
+    }
+
+    function configurarNuvem() {
+      const c = global.Cloud.config();
+      global.UI.modal({
+        title: 'Configurar compartilhamento', icon: 'globe', wide: true,
+        build: (b) => {
+          b.append(el('ol', {
+            class: 'passos', html: `
+            <li>Crie um projeto gratuito em <b>supabase.com</b>.</li>
+            <li>Em <b>SQL Editor</b>, cole e rode o SQL abaixo (cria a tabela, o bucket e as permissões).</li>
+            <li>Em <b>Project Settings → API</b>, copie a <b>Project URL</b> e a chave <b>anon public</b>.</li>
+            <li>Cole os dois aqui. Para todo mundo entrar já configurado, cole também no arquivo <code>config.js</code> do repositório.</li>`,
+          }));
+          b.append(el('button', { class: 'btn btn--sm', html: `${icon('copy')}Copiar o SQL`, onclick: copiarSQL }));
+          b.append(el('div', { class: 'field' }, [
+            el('label', { class: 'label', for: 'nu-url', text: 'Project URL' }),
+            el('input', { class: 'input', id: 'nu-url', value: c.url, placeholder: 'https://xxxx.supabase.co' }),
+          ]));
+          b.append(el('div', { class: 'field' }, [
+            el('label', { class: 'label', for: 'nu-key', text: 'Chave anon (public)' }),
+            el('input', { class: 'input', id: 'nu-key', value: c.key, placeholder: 'eyJhbGciOi…' }),
+            el('span', { class: 'hint', text: 'É a chave pública, feita para ficar no navegador. Não use a service_role.' }),
+          ]));
+          b.append(el('div', { class: 'field' }, [
+            el('label', { class: 'label', for: 'nu-ws', text: 'Equipe' }),
+            el('input', { class: 'input', id: 'nu-ws', value: c.workspace }),
+            el('span', { class: 'hint', text: 'Separa times diferentes dentro do mesmo projeto.' }),
+          ]));
+        },
+        foot: (close) => [
+          global.Cloud.isOn() ? el('button', {
+            class: 'btn btn--danger', text: 'Desconectar',
+            onclick: () => { global.Cloud.clearConfig(); global.Cloud.stop(); close(); global.App.render(); global.UI.toast('Desconectado. Os dados continuam neste navegador.', 'warn'); },
+          }) : null,
+          el('button', { class: 'btn', text: 'Cancelar', onclick: close }),
+          el('button', {
+            class: 'btn btn--primary', html: `${icon('check')}Testar e salvar`,
+            onclick: async (e) => {
+              const m = e.target.closest('.modal');
+              const btn = e.target.closest('button');
+              btn.disabled = true; btn.innerHTML = 'Testando…';
+              global.Cloud.setConfig({
+                url: m.querySelector('#nu-url').value.trim().replace(/\/+$/, ''),
+                key: m.querySelector('#nu-key').value.trim(),
+                workspace: m.querySelector('#nu-ws').value.trim() || 'bracerum',
+              });
+              try {
+                await global.Cloud.testar();
+                await St().startSync();
+                close();
+                global.App.render();
+                global.UI.toast('Conectado. Agora a equipe vê as mesmas peças.', 'ok', 5000);
+              } catch (err) {
+                btn.disabled = false; btn.innerHTML = `${icon('check')}Testar e salvar`;
+                global.UI.toast('Não consegui conectar: ' + err.message, 'err', 8000);
+              }
+            },
+          }),
+        ].filter(Boolean),
+      });
+    }
+
+    async function migrarMidias() {
+      const total = St().contarMidiaLocal();
+      const m = global.UI.modal({
+        title: 'Enviando as mídias', icon: 'upload',
+        build: (b) => {
+          b.append(el('p', { class: 'hint', text: 'As imagens que hoje só existem neste navegador estão indo para o armazenamento compartilhado. Ninguém precisa reenviar nada.' }));
+          b.append(el('div', { class: 'prog', html: '<div class="prog__bar" style="width:0"></div>' }));
+          b.append(el('p', { class: 'tiny dim', id: 'mig-txt', text: `0 de ${total}` }));
+        },
+      });
+      try {
+        const r = await St().migrarMidias((i, t, nome) => {
+          const bar = m.body.querySelector('.prog__bar');
+          if (bar) bar.style.width = `${Math.round((i / t) * 100)}%`;
+          const txt = m.body.querySelector('#mig-txt');
+          if (txt) txt.textContent = `${i + 1} de ${t} — ${nome}`;
+        });
+        m.close();
+        if (r.falhas.length) {
+          global.UI.toast(`${r.total - r.falhas.length} de ${r.total} enviadas — ${global.U.plural(r.falhas.length, 'falhou', 'falharam')}.`, 'warn', 9000);
+          console.warn('[aprova] falhas no envio', r.falhas);
+        } else {
+          global.UI.toast(`${global.U.plural(r.total, 'mídia enviada', 'mídias enviadas')}. Agora todo mundo vê.`, 'ok', 6000);
+        }
+        global.App.render();
+      } catch (e) {
+        m.close();
+        global.UI.toast('Falhou: ' + e.message, 'err', 8000);
+      }
+    }
+
+    function importar() {
+      const input = el('input', { type: 'file', accept: 'application/json,.json', style: 'display:none' });
+      input.onchange = async () => {
+        const f = input.files?.[0];
+        if (!f) return;
+        const texto = await f.text();
+        global.UI.modal({
+          title: 'Importar cópia', icon: 'upload',
+          build: (b) => {
+            b.append(el('p', { class: 'muted', html: `Arquivo: <b>${esc(f.name)}</b>` }));
+            b.append(el('p', { class: 'hint', text: 'Mesclar mantém o que já existe aqui e traz o que falta, resolvendo cada peça pela edição mais recente. Substituir joga fora o conteúdo atual deste navegador.' }));
+          },
+          foot: (close) => [
+            el('button', { class: 'btn', text: 'Cancelar', onclick: close }),
+            el('button', {
+              class: 'btn btn--danger', text: 'Substituir', onclick: () => {
+                try { const n = St().importState(texto, 'substituir'); close(); global.UI.toast(`${n} postagens importadas.`, 'ok'); }
+                catch (err) { global.UI.toast(err.message, 'err', 7000); }
+              },
+            }),
+            el('button', {
+              class: 'btn btn--primary', text: 'Mesclar', onclick: () => {
+                try { const n = St().importState(texto, 'mesclar'); close(); global.UI.toast(`${n} postagens no arquivo — conteúdo mesclado.`, 'ok'); }
+                catch (err) { global.UI.toast(err.message, 'err', 7000); }
+              },
+            }),
+          ],
+        });
+      };
+      document.body.append(input);
+      input.click();
+      setTimeout(() => input.remove(), 60000);
+    }
 
     function painelSimples(t, ic) {
       const panel = el('section', { class: 'panel', style: 'margin-bottom:var(--s-4)' });

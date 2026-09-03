@@ -28,6 +28,8 @@
       settings: { ...DEFAULT_SETTINGS },
       currentUserId: null,
       seq: global.SEED.POSTS.length,
+      /* o que foi apagado, para a exclusão não "ressuscitar" na sincronização */
+      deleted: {},
     };
   }
 
@@ -41,6 +43,7 @@
       const parsed = JSON.parse(raw);
       // mescla defaults novos sem apagar o que o usuário já tem
       parsed.settings = { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) };
+      parsed.deleted = parsed.deleted || {};
       return parsed;
     } catch (e) {
       console.warn('[aprova] estado ilegível, recomeçando', e);
@@ -60,7 +63,142 @@
 
   function emit(reason, detail = {}) {
     persist();
+    if (reason !== 'sync') pushSoon();
     global.dispatchEvent(new CustomEvent('aprova:change', { detail: { reason, ...detail } }));
+  }
+
+  /* ==========================================================================
+     SINCRONIZAÇÃO
+     O que é da equipe sobe; o que é de cada pessoa fica. Tema, dispositivo e
+     quem está logado são preferências locais e não viajam.
+     ========================================================================== */
+  const PESSOAL = ['settings', 'currentUserId'];
+
+  /** O recorte do estado que a equipe compartilha. */
+  function syncDoc() {
+    const { settings: _s, currentUserId: _u, ...resto } = state;
+    return { v: 2, ...resto };
+  }
+
+  let pushTimer = null;
+  let pushErro = null;
+  function pushSoon() {
+    if (!global.Cloud?.isOn()) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(async () => {
+      try {
+        await global.Cloud.push(syncDoc());
+        pushErro = null;
+      } catch (e) {
+        pushErro = e.message;
+        console.warn('[aprova] não deu para enviar', e);
+      }
+      global.dispatchEvent(new CustomEvent('aprova:sync', { detail: { erro: pushErro } }));
+    }, 1200);
+  }
+
+  /**
+   * Junta o que veio do servidor com o que existe aqui. A regra é por peça:
+   * vence a versão editada por último. Assim duas pessoas podem trabalhar em
+   * postagens diferentes ao mesmo tempo sem uma apagar a outra.
+   */
+  function mergeRemote(doc) {
+    if (!doc) return false;
+    const antes = JSON.stringify(syncDoc());
+
+    state.deleted = { ...(doc.deleted || {}), ...(state.deleted || {}) };
+
+    const porId = new Map();
+    (doc.posts || []).forEach((p) => porId.set(p.id, p));
+    (state.posts || []).forEach((p) => {
+      const r = porId.get(p.id);
+      if (!r) return porId.set(p.id, p);
+      porId.set(p.id, new Date(p.updatedAt || 0) >= new Date(r.updatedAt || 0) ? p : r);
+    });
+    state.posts = [...porId.values()]
+      .filter((p) => !state.deleted[p.id])
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    const srcs = new Set();
+    state.library = [...(doc.library || []), ...(state.library || [])]
+      .filter((m) => (srcs.has(m.src) ? false : srcs.add(m.src)));
+
+    const nIds = new Set();
+    state.notifications = [...(state.notifications || []), ...(doc.notifications || [])]
+      .filter((n) => (nIds.has(n.id) ? false : nIds.add(n.id)))
+      .sort((a, b) => new Date(b.at) - new Date(a.at))
+      .slice(0, 60);
+
+    if (doc.users?.length) state.users = doc.users;
+    if (doc.brand) state.brand = doc.brand;
+    state.seq = Math.max(state.seq || 0, doc.seq || 0);
+
+    const mudou = antes !== JSON.stringify(syncDoc());
+    if (mudou) emit('sync');
+    else persist();
+    return mudou;
+  }
+
+  /** Primeira carga: puxa o que já existe e começa a ouvir mudanças. */
+  async function startSync() {
+    if (!global.Cloud?.isOn()) return;
+    try {
+      const r = await global.Cloud.pull();
+      if (r) mergeRemote(r.doc);
+      else await global.Cloud.push(syncDoc()); // servidor vazio: semeia com o que há aqui
+    } catch (e) {
+      console.warn('[aprova] sincronização indisponível', e);
+      global.dispatchEvent(new CustomEvent('aprova:sync', { detail: { erro: e.message } }));
+    }
+    global.Cloud.start((novo) => mergeRemote(novo.doc));
+  }
+
+  /* ---------------------------------------------------- mídia para a nuvem */
+  const ehDataUrl = (s) => typeof s === 'string' && s.startsWith('data:');
+
+  /** Quantos arquivos ainda existem só como base64 neste navegador. */
+  function contarMidiaLocal() {
+    let n = 0;
+    (state.posts || []).forEach((p) => (p.media || []).forEach((m) => {
+      if (ehDataUrl(m.src)) n++;
+      if (ehDataUrl(m.poster)) n++;
+    }));
+    (state.library || []).forEach((m) => { if (ehDataUrl(m.src)) n++; });
+    if (ehDataUrl(state.brand?.avatar)) n++;
+    if (ehDataUrl(state.brand?.cover)) n++;
+    return n;
+  }
+
+  /**
+   * Sobe para o armazenamento compartilhado tudo o que hoje é base64 e troca
+   * o endereço no estado. É o que resolve “as imagens só aparecem para mim”
+   * sem ninguém reenviar arquivo.
+   */
+  async function migrarMidias(aoAndar) {
+    if (!global.Cloud?.isOn()) throw new Error('Configure a sincronização antes.');
+    const alvos = [];
+    (state.posts || []).forEach((p) => (p.media || []).forEach((m) => {
+      if (ehDataUrl(m.src)) alvos.push({ obj: m, campo: 'src', nome: m.alt || p.code });
+      if (ehDataUrl(m.poster)) alvos.push({ obj: m, campo: 'poster', nome: (m.alt || p.code) + '-capa' });
+    }));
+    (state.library || []).forEach((m) => { if (ehDataUrl(m.src)) alvos.push({ obj: m, campo: 'src', nome: m.alt || 'acervo' }); });
+    if (ehDataUrl(state.brand?.avatar)) alvos.push({ obj: state.brand, campo: 'avatar', nome: 'marca-avatar' });
+    if (ehDataUrl(state.brand?.cover)) alvos.push({ obj: state.brand, campo: 'cover', nome: 'marca-capa' });
+
+    const falhas = [];
+    for (let i = 0; i < alvos.length; i++) {
+      const a = alvos[i];
+      aoAndar?.(i, alvos.length, a.nome);
+      try {
+        a.obj[a.campo] = await global.Cloud.uploadMedia(a.obj[a.campo], a.nome);
+      } catch (e) {
+        falhas.push(`${a.nome}: ${e.message}`);
+      }
+    }
+    persist();
+    try { await global.Cloud.push(syncDoc()); } catch (e) { falhas.push('envio final: ' + e.message); }
+    emit('sync');
+    return { total: alvos.length, falhas };
   }
 
   /** Guarda um retrato do estado antes de uma ação destrutiva. */
@@ -195,6 +333,7 @@
 
   function deletePost(id) {
     snapshot('excluir postagem');
+    (state.deleted ||= {})[id] = new Date().toISOString();
     state.posts = state.posts.filter((p) => p.id !== id);
     state.notifications = state.notifications.filter((n) => n.postId !== id);
     emit('post:delete', { postId: id });
@@ -445,9 +584,41 @@
     emit('reset');
   }
 
-  /** Exporta o plano de conteúdo — o que o cliente costuma pedir por e-mail. */
+  /**
+   * Cópia completa e reimportável: leva as mídias embutidas, então serve tanto
+   * de backup quanto de mudança de navegador sem reenviar arquivo.
+   */
   function exportJSON() {
-    return JSON.stringify({ exportadoEm: new Date().toISOString(), marca: state.brand.name, postagens: state.posts }, null, 2);
+    return JSON.stringify({
+      aplicativo: 'APROVA', formato: 2,
+      exportadoEm: new Date().toISOString(),
+      marca: state.brand?.name,
+      dados: syncDoc(),
+    }, null, 2);
+  }
+
+  /** @param {'substituir'|'mesclar'} modo */
+  function importState(texto, modo = 'mesclar') {
+    let entrada;
+    try { entrada = typeof texto === 'string' ? JSON.parse(texto) : texto; }
+    catch (e) { throw new Error('Arquivo inválido: não é um JSON.'); }
+
+    /* aceita a cópia nova e também o formato antigo, que era só a lista */
+    const doc = entrada.dados
+      || (Array.isArray(entrada.postagens) ? { posts: entrada.postagens } : null)
+      || (Array.isArray(entrada.posts) ? entrada : null);
+    if (!doc?.posts) throw new Error('Não encontrei postagens neste arquivo.');
+
+    snapshot('importar dados');
+    if (modo === 'substituir') {
+      const s = state.settings, u = state.currentUserId;
+      state = { ...fresh(), ...doc, settings: s, currentUserId: u };
+      emit('import');
+    } else {
+      mergeRemote(doc);
+      emit('import');
+    }
+    return doc.posts.length;
   }
 
   global.Store = {
@@ -459,6 +630,7 @@
     addCaption, updateCaption, removeCaption, chooseCaption, suggestCaption, applySuggestion,
     comment, reply, toggleResolved, deleteActivity,
     approve, requestChanges,
-    markAllRead, addToLibrary, snapshot, canUndo, undo, reset, exportJSON,
+    markAllRead, addToLibrary, snapshot, canUndo, undo, reset, exportJSON, importState,
+    syncDoc, mergeRemote, startSync, migrarMidias, contarMidiaLocal, pushSoon,
   };
 })(window);

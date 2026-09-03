@@ -4,7 +4,8 @@ Aplicativo web para o ciclo **criar → revisar → aprovar → agendar** de pos
 Instagram, Facebook e LinkedIn, com ou sem impulsionamento. Roda sem servidor, sem
 build e sem dependência externa.
 
-Os dados ficam no `localStorage` do navegador. Nada sai do dispositivo.
+Por padrão os dados ficam no `localStorage` — **por navegador**. Para a equipe
+inteira ver as mesmas peças, ligue o compartilhamento (abaixo).
 
 ## Como abrir
 
@@ -22,6 +23,61 @@ Para publicar: **Settings → Pages → Deploy from branch → `main` / `(root)`
 projeto é estático, não precisa de build.
 
 ---
+
+## Onde os dados ficam
+
+Há dois modos, e o aplicativo diz em qual está por um selo no topo:
+
+| Selo | O que significa |
+|---|---|
+| 🔒 **só aqui** | Tudo vive no `localStorage` deste navegador. Ninguém mais vê, nem você em janela anônima ou em outro aparelho. Limpar o cache apaga. |
+| 🌐 **em equipe** | As peças, os comentários e as imagens ficam num projeto Supabase. Todo mundo que abrir o site vê o mesmo. |
+
+### Ligar o compartilhamento (uma vez, ~5 min)
+
+1. Crie um projeto gratuito em **supabase.com**.
+2. **SQL Editor** → cole e rode o SQL que o aplicativo entrega em
+   **Ajustes → Compartilhamento → Copiar o SQL da instalação**. Ele cria a tabela
+   `aprova_docs`, o bucket `aprova` e as permissões.
+3. **Project Settings → API** → copie a *Project URL* e a chave *anon public*.
+4. Em **Ajustes → Configurar compartilhamento**, cole os dois e clique em
+   **Testar e salvar**.
+5. Para todo mundo já entrar conectado, cole os mesmos valores em `config.js`
+   e publique. Sem isso, cada pessoa teria de configurar no próprio navegador.
+
+A chave `anon` é pública de propósito: ela vai para o navegador de quem abrir o
+site. Quem protege os dados são as políticas (RLS) do SQL, não o sigilo da chave.
+**Nunca coloque a `service_role` no `config.js`.** As políticas que o SQL cria são
+permissivas — qualquer pessoa com o link lê e grava. Serve para uma equipe pequena
+com o link fechado; para algo mais sério, troque por políticas com `auth.uid()`.
+
+### E as imagens que já subi?
+
+Se você criou peças antes de ligar o compartilhamento, as imagens estão em base64
+dentro do `localStorage`. Em **Ajustes → Compartilhamento** aparece
+**"Enviar N mídias locais"**: o aplicativo sobe cada uma para o armazenamento
+compartilhado e troca o endereço na peça. **Ninguém reenvia arquivo nenhum.**
+
+### Cópia dos dados
+
+**Ajustes → Cópia dos dados → Baixar cópia completa** gera um JSON com as
+postagens, os comentários e **as imagens embutidas**. Serve de backup e de
+mudança de navegador: em outro aparelho, **Importar cópia** traz tudo de volta.
+Na importação, *mesclar* resolve cada peça pela edição mais recente e *substituir*
+troca o conteúdo local inteiro.
+
+Se você ainda está no modo "só aqui", **baixe uma cópia antes de limpar o cache**.
+
+### Como a sincronização se comporta
+
+- O que sobe: postagens, comentários, decisões, acervo, contas e a marca.
+- O que fica local: tema, dispositivo do preview e quem está logado — são
+  preferências de cada pessoa.
+- Cada navegador confere o servidor a cada 10 segundos e ao voltar para a aba.
+- A junção é **por peça**: vence a versão editada por último. Duas pessoas em
+  postagens diferentes não se atrapalham; duas pessoas na *mesma* peça ao mesmo
+  tempo, sim — a última gravação vence.
+- Exclusões deixam marca, para não voltarem na próxima sincronização.
 
 ## Entrar
 
@@ -158,6 +214,7 @@ Sem framework e sem build — a mesma stack do site do parque.
 ```
 .
 ├── index.html
+├── config.js           URL e chave do Supabase (vazio = modo local)
 ├── assets/             renders do parque usados na demonstração
 ├── css/
 │   ├── tokens.css      design system: cor, tipo, espaço, raio, sombra, motion
@@ -165,6 +222,7 @@ Sem framework e sem build — a mesma stack do site do parque.
 │   └── previews.css    molduras de celular/navegador e o visual de cada rede
 └── js/
     ├── util.js         DOM, ícones, datas, animação, redimensionamento de imagem
+    ├── cloud.js        conversa com o Supabase por REST, sem SDK
     ├── seed.js         catálogo (redes, formatos, estados) + massa de demonstração
     ├── store.js        estado único, persistência e todas as ações nomeadas
     ├── previews.js     renderização fiel de Instagram / Facebook / LinkedIn / Ads
@@ -191,10 +249,13 @@ navegação no celular para o polegar alcançar.
   moldura de cada plataforma, que muda com frequência.
 - **Não publica.** O agendamento registra o compromisso combinado; a publicação
   em si continua na ferramenta de postagem.
-- **Dados locais.** Sem servidor, cada navegador tem a sua cópia — não há
-  colaboração entre máquinas, e o e-mail identifica sem autenticar. É o passo
-  natural seguinte: uma API e autenticação de verdade, com link de convidado
-  para o aprovador (sem exigir conta).
+- **Sem autenticação de verdade.** O e-mail identifica quem revisa; a chave anon
+  dá acesso de leitura e escrita a quem tiver o link. Para uso fora de uma equipe
+  de confiança, o passo seguinte é Supabase Auth com políticas por `auth.uid()`.
+- **Junção simples.** A sincronização resolve conflitos por peça, pela edição mais
+  recente. Não há edição simultânea de campo, como num editor colaborativo.
+- **Sem compartilhamento configurado, os dados são do navegador.** Limpar o cache
+  apaga tudo o que não tiver cópia.
 - **A ferramenta começa vazia.** Não há conteúdo de demonstração: as peças são as
   que a equipe criar. O acervo de renders do parque continua disponível no
   compositor.

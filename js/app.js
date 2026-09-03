@@ -212,6 +212,17 @@
       onclick: () => painelNotificacoes(),
     }));
 
+    /* deixa claro, o tempo todo, se o que está na tela existe só aqui */
+    const naNuvem = global.Cloud.isOn();
+    bar.append(el('button', {
+      class: 'chip chip--sm' + (naNuvem ? '' : ' chip--alerta'),
+      title: naNuvem
+        ? `Sincronizado com ${global.Cloud.config().url.replace(/^https?:\/\//, '')}`
+        : 'Estas peças existem só neste navegador. Clique para compartilhar com a equipe.',
+      html: `${icon(naNuvem ? 'globe' : 'lock')}<span class="sync-lbl">${naNuvem ? 'em equipe' : 'só aqui'}</span>`,
+      onclick: () => App.go({ view: 'settings' }),
+    }));
+
     bar.append(el('button', {
       class: 'btn btn--ghost btn--icon', 'aria-label': 'Comandos', title: 'Comandos (Ctrl+K)',
       html: icon('zap'), onclick: () => paleta(),
@@ -454,6 +465,49 @@
     global.UI.toast('Resumo copiado — cole na planilha.', 'ok');
   };
 
+  /* ===================================================== SQL de apoio === */
+  /* Cola no SQL Editor do Supabase: cria a tabela do documento da equipe, o
+     bucket de mídias e as permissões. A chave anon fica pública no navegador,
+     então quem controla o acesso são estas políticas. */
+  App.SQL_SUPABASE = `-- APROVA — instalação (rode uma vez no SQL Editor do Supabase)
+
+create table if not exists public.aprova_docs (
+  id          text primary key,
+  doc         jsonb not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now()
+);
+
+alter table public.aprova_docs enable row level security;
+
+-- Equipe pequena com link compartilhado: quem tem a chave anon lê e grava.
+-- Para restringir de verdade, troque por políticas com auth.uid().
+drop policy if exists "aprova leitura" on public.aprova_docs;
+create policy "aprova leitura" on public.aprova_docs for select using (true);
+
+drop policy if exists "aprova escrita" on public.aprova_docs;
+create policy "aprova escrita" on public.aprova_docs for insert with check (true);
+
+drop policy if exists "aprova atualizacao" on public.aprova_docs;
+create policy "aprova atualizacao" on public.aprova_docs for update using (true) with check (true);
+
+-- Bucket das mídias, leitura pública (as imagens aparecem no <img>)
+insert into storage.buckets (id, name, public)
+values ('aprova', 'aprova', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "aprova midia leitura" on storage.objects;
+create policy "aprova midia leitura" on storage.objects
+  for select using (bucket_id = 'aprova');
+
+drop policy if exists "aprova midia envio" on storage.objects;
+create policy "aprova midia envio" on storage.objects
+  for insert with check (bucket_id = 'aprova');
+
+drop policy if exists "aprova midia troca" on storage.objects;
+create policy "aprova midia troca" on storage.objects
+  for update using (bucket_id = 'aprova') with check (bucket_id = 'aprova');
+`;
+
   /* ========================================================= atalhos ==== */
   function atalhos(e) {
     const digitando = /input|textarea|select/i.test(e.target.tagName) || e.target.isContentEditable;
@@ -503,6 +557,12 @@
       b.style.setProperty('--mx', `${e.clientX - r.left}px`);
       b.style.setProperty('--my', `${e.clientY - r.top}px`);
     }, { passive: true });
+
+    /* puxa o que a equipe já tem antes de desenhar qualquer coisa */
+    St().startSync();
+    global.addEventListener('aprova:sync', (e) => {
+      if (e.detail?.erro) global.UI.toast('Sincronização falhou: ' + e.detail.erro, 'err', 7000);
+    });
 
     App.render();
   }
