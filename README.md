@@ -24,18 +24,21 @@ projeto é estático, não precisa de build.
 
 ---
 
-## Instalação (uma vez, ~5 min)
+## Instalação
 
-O aplicativo precisa de um lugar para gravar. Enquanto `config.js` estiver
-vazio, ele **não abre** — mostra a tela de instalação, que conduz o processo:
+O aplicativo precisa de um lugar para gravar. Enquanto a **chave** faltar em
+`config.js`, ele **não abre** — mostra a tela de instalação, que conduz o resto.
 
-1. Crie um projeto gratuito em **supabase.com**.
-2. **SQL Editor → New query**: cole o SQL que a tela entrega no botão
-   *Copiar o SQL da instalação* e rode. Ele cria a tabela `aprova_docs`, o
-   bucket `aprova` e as permissões.
-3. **Project Settings → API**: copie a *Project URL* e a chave *anon public*.
-4. Cole as duas na tela e clique em **Conectar**.
-5. A tela devolve o bloco pronto do `config.js`. **Cole no repositório e
+O projeto já está apontado: **BracerumParkAprova**
+(`https://kddungxbtibpzcphmtna.supabase.co`). Falta:
+
+1. **SQL Editor → New query**: cole o conteúdo de
+   [`supabase/instalacao.sql`](supabase/instalacao.sql) — o mesmo que a tela
+   entrega no botão *Copiar o SQL da instalação* — e clique em **Run**. Ele cria
+   a tabela `aprova_docs`, o bucket `aprova` e as permissões.
+2. **Project Settings → API**: copie a chave **anon public**.
+3. Cole a chave na tela de instalação e clique em **Conectar**.
+4. A tela devolve o bloco pronto do `config.js`. **Cole no repositório e
    publique** — é isso que faz o resto da equipe entrar já conectada, sem ver
    a instalação.
 
@@ -204,7 +207,9 @@ Sem framework e sem build — a mesma stack do site do parque.
 ```
 .
 ├── index.html
-├── config.js           URL e chave do Supabase (vazio = o app mostra a instalação)
+├── config.js           URL e chave do Supabase (sem chave = o app mostra a instalação)
+├── supabase/
+│   └── instalacao.sql  tabela, bucket e permissões (rodar uma vez)
 ├── assets/             renders do parque usados na demonstração
 ├── css/
 │   ├── tokens.css      design system: cor, tipo, espaço, raio, sombra, motion
@@ -244,8 +249,8 @@ navegação no celular para o polegar alcançar.
   de confiança, o passo seguinte é Supabase Auth com políticas por `auth.uid()`.
 - **Junção simples.** A sincronização resolve conflitos por peça, pela edição mais
   recente. Não há edição simultânea de campo, como num editor colaborativo.
-- **A instalação depende de você.** Criar o projeto no Supabase exige uma conta;
-  é o único passo que não dá para automatizar.
+- **A chave depende de você.** Ela fica no painel do Supabase, atrás do login da
+  conta — é o passo que não dá para automatizar daqui.
 - **A ferramenta começa vazia.** Não há conteúdo de demonstração: as peças são as
   que a equipe criar. O acervo de renders do parque continua disponível no
   compositor.

@@ -373,21 +373,29 @@
     const tela = el('div', { id: 'setup', class: 'gate' }, [box]);
 
     box.append(el('span', { class: 'gate__mark', html: icon('globe') }));
+    const temUrl = !!global.Cloud.config().url;
     const intro = el('div', {
       class: 'stack stack--sm', html: `
       <h1 class="h1">Ligar o APROVA à sua equipe</h1>
       <p class="muted" style="max-width:60ch;margin:0 auto">Falta o lugar onde as peças, os comentários
-      e as imagens vão morar. São dois valores, colados uma vez. Sem isso o aplicativo não abre —
-      de propósito: conteúdo preso no navegador de uma pessoa não serve para aprovar nada.</p>`,
+      e as imagens vão morar. ${temUrl
+        ? 'O projeto já está apontado — falta a chave.'
+        : 'São dois valores, colados uma vez.'}
+      Sem isso o aplicativo não abre — de propósito: conteúdo preso no navegador de uma pessoa
+      não serve para aprovar nada.</p>`,
     });
     box.append(intro);
 
+    const jaTemUrl = temUrl;
     const passos = el('ol', { class: 'passos passos--grande' });
-    passos.innerHTML = `
-      <li>Crie um projeto gratuito em <b><a href="https://supabase.com/dashboard/new" target="_blank" rel="noopener">supabase.com</a></b> (leva ~2 minutos, inclui o e-mail de confirmação).</li>
-      <li>No projeto, abra <b>SQL Editor</b> → <b>New query</b>, cole o SQL do botão abaixo e clique em <b>Run</b>.</li>
-      <li>Abra <b>Project Settings → API</b> e copie a <b>Project URL</b> e a chave <b>anon public</b>.</li>
-      <li>Cole as duas aqui embaixo.</li>`;
+    passos.innerHTML = jaTemUrl
+      ? `<li>No projeto, abra <b>SQL Editor</b> → <b>New query</b>, cole o SQL do botão abaixo e clique em <b>Run</b>.</li>
+         <li>Abra <b>Project Settings → API</b> e copie a chave <b>anon public</b>.</li>
+         <li>Cole a chave aqui embaixo. O endereço do projeto já veio configurado.</li>`
+      : `<li>Crie um projeto gratuito em <b><a href="https://supabase.com/dashboard/new" target="_blank" rel="noopener">supabase.com</a></b> (leva ~2 minutos, inclui o e-mail de confirmação).</li>
+         <li>No projeto, abra <b>SQL Editor</b> → <b>New query</b>, cole o SQL do botão abaixo e clique em <b>Run</b>.</li>
+         <li>Abra <b>Project Settings → API</b> e copie a <b>Project URL</b> e a chave <b>anon public</b>.</li>
+         <li>Cole as duas aqui embaixo.</li>`;
     box.append(passos);
 
     const antes = el('div', { class: 'stack', style: 'width:100%;justify-items:center' });
@@ -500,7 +508,7 @@
       box.append(resgate);
     }
     document.body.append(tela);
-    setTimeout(() => $('#su-url', form)?.focus(), 120);
+    setTimeout(() => (jaTemUrl ? $('#su-key', form) : $('#su-url', form))?.focus(), 120);
   }
 
   /** O trecho pronto para colar no config.js do repositório. */

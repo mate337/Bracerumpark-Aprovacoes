@@ -101,7 +101,13 @@ base64 sozinha.
   mim" sem ninguém reenviar arquivo. O bucket precisa ser **público para
   leitura**, senão o `<img>` não carrega (não dá para mandar header em `<img>`).
 - O SQL de instalação vive em `App.SQL_SUPABASE`, em `js/app.js`, e é o mesmo
-  texto que o botão "Copiar o SQL" entrega.
+  texto que o botão "Copiar o SQL" entrega. Uma cópia fica em
+  `supabase/instalacao.sql` — se mudar um, gere o outro a partir dele.
+- O projeto é o **BracerumParkAprova** (`kddungxbtibpzcphmtna`). A URL já está em
+  `config.js`; só a chave anon fica de fora, porque exige o painel do Supabase.
+- `.mcp.json` registra o servidor MCP do Supabase para sessões locais do Claude
+  Code. Ele exige autenticação por OAuth (`claude /mcp`), que não roda em sessão
+  remota — não conte com ele aqui.
 - A flag `instalando` em `js/app.js` impede que um `aprova:change` disparado
   pela própria conexão redesenhe por cima da tela de instalação antes de a
   pessoa copiar o `config.js`.

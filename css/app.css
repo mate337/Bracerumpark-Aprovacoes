@@ -1105,7 +1105,9 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 /* passo a passo dentro de um modal */
 /* lista numerada de verdade: em display:grid os marcadores somem, e aqui o
    número do passo é a informação principal */
-.passos { margin: 0; padding-left: 22px; font-size: var(--t-sm); color: var(--txt-2); }
+/* o reset global tira o marcador de toda lista; aqui o número do passo é a
+   informação principal, então ele volta */
+.passos { margin: 0; padding-left: 22px; list-style: decimal; font-size: var(--t-sm); color: var(--txt-2); }
 .passos li { line-height: 1.55; margin-bottom: var(--s-2); padding-left: 4px; }
 .passos li::marker { color: var(--brand-lift); font-weight: 700; }
 .passos code {

@@ -17,8 +17,9 @@
    não o sigilo da chave. NUNCA cole aqui a chave "service_role".
    ========================================================================== */
 window.APROVA_CONFIG = {
-  url: '',              // https://xxxxxxxx.supabase.co
-  key: '',              // chave anon (public)
+  // Projeto "BracerumParkAprova" (ref kddungxbtibpzcphmtna)
+  url: 'https://kddungxbtibpzcphmtna.supabase.co',
+  key: '',              // FALTA: chave anon (public), em Project Settings → API
   table: 'aprova_docs', // criada pelo SQL da instalação
   bucket: 'aprova',     // bucket de mídias, público para leitura
   workspace: 'bracerum',// permite mais de uma equipe no mesmo projeto
