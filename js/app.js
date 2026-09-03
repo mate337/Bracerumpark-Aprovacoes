@@ -78,7 +78,17 @@
     raf = requestAnimationFrame(desenhar);
   };
 
+  /* enquanto a instalação está na tela, nada redesenha por cima dela — a
+     própria conexão dispara um "aprova:change" no meio do caminho */
+  let instalando = false;
+
   function desenhar() {
+    /* Não existe mais "modo local": sem um lugar comum, não há aplicativo —
+       só a tela que o instala. */
+    if (!global.Cloud.isOn()) return telaInstalacao();
+    if (instalando) return;
+    $('#setup')?.remove();
+
     const me = St().me();
     if (!me) return portao();
 
@@ -212,14 +222,15 @@
       onclick: () => painelNotificacoes(),
     }));
 
-    /* deixa claro, o tempo todo, se o que está na tela existe só aqui */
-    const naNuvem = global.Cloud.isOn();
+    /* estado da conexão com a equipe — verde quando tudo trafega */
+    const est = global.Cloud.status();
+    const falha = !!est.erro;
     bar.append(el('button', {
-      class: 'chip chip--sm' + (naNuvem ? '' : ' chip--alerta'),
-      title: naNuvem
-        ? `Sincronizado com ${global.Cloud.config().url.replace(/^https?:\/\//, '')}`
-        : 'Estas peças existem só neste navegador. Clique para compartilhar com a equipe.',
-      html: `${icon(naNuvem ? 'globe' : 'lock')}<span class="sync-lbl">${naNuvem ? 'em equipe' : 'só aqui'}</span>`,
+      class: 'chip chip--sm' + (falha ? ' chip--alerta' : ' chip--ok'),
+      title: falha
+        ? `Sem falar com o servidor: ${est.erro}. As mudanças ficam guardadas e sobem quando voltar.`
+        : `Em equipe · ${global.Cloud.config().url.replace(/^https?:\/\//, '')}${est.em ? ' · última troca ' + ago(est.em) : ''}`,
+      html: `${icon(falha ? 'alert' : 'globe')}<span class="sync-lbl">${falha ? 'reconectando' : 'em equipe'}</span>`,
       onclick: () => App.go({ view: 'settings' }),
     }));
 
@@ -346,6 +357,173 @@
     });
   }
 
+  /* ================================================ tela de instalação == */
+  /**
+   * Aparece quando o aplicativo ainda não tem para onde gravar. Não é um "modo"
+   * — é a instalação. Enquanto não terminar, ninguém entra, porque conteúdo
+   * preso num navegador só é problema adiado.
+   */
+  function telaInstalacao() {
+    $('#app').hidden = true;
+    $('#gate')?.remove();
+    if ($('#setup')) return;
+    instalando = true;
+
+    const box = el('div', { class: 'gate__box setup' });
+    const tela = el('div', { id: 'setup', class: 'gate' }, [box]);
+
+    box.append(el('span', { class: 'gate__mark', html: icon('globe') }));
+    const intro = el('div', {
+      class: 'stack stack--sm', html: `
+      <h1 class="h1">Ligar o APROVA à sua equipe</h1>
+      <p class="muted" style="max-width:60ch;margin:0 auto">Falta o lugar onde as peças, os comentários
+      e as imagens vão morar. São dois valores, colados uma vez. Sem isso o aplicativo não abre —
+      de propósito: conteúdo preso no navegador de uma pessoa não serve para aprovar nada.</p>`,
+    });
+    box.append(intro);
+
+    const passos = el('ol', { class: 'passos passos--grande' });
+    passos.innerHTML = `
+      <li>Crie um projeto gratuito em <b><a href="https://supabase.com/dashboard/new" target="_blank" rel="noopener">supabase.com</a></b> (leva ~2 minutos, inclui o e-mail de confirmação).</li>
+      <li>No projeto, abra <b>SQL Editor</b> → <b>New query</b>, cole o SQL do botão abaixo e clique em <b>Run</b>.</li>
+      <li>Abra <b>Project Settings → API</b> e copie a <b>Project URL</b> e a chave <b>anon public</b>.</li>
+      <li>Cole as duas aqui embaixo.</li>`;
+    box.append(passos);
+
+    const antes = el('div', { class: 'stack', style: 'width:100%;justify-items:center' });
+    antes.append(el('button', {
+      class: 'btn', html: `${icon('copy')}Copiar o SQL da instalação`,
+      onclick: () => {
+        navigator.clipboard?.writeText(App.SQL_SUPABASE);
+        global.UI.toast('SQL copiado. Cole no SQL Editor do Supabase e rode.', 'ok', 6000);
+      },
+    }));
+    box.append(antes);
+
+    const form = el('form', { class: 'gate__form', novalidate: true });
+    const c = global.Cloud.config();
+    form.append(el('div', { class: 'field' }, [
+      el('label', { class: 'label', for: 'su-url', text: 'Project URL' }),
+      el('input', { class: 'input', id: 'su-url', value: c.url, placeholder: 'https://xxxxxxxx.supabase.co', autocapitalize: 'off', spellcheck: 'false' }),
+    ]));
+    form.append(el('div', { class: 'field' }, [
+      el('label', { class: 'label', for: 'su-key', text: 'Chave anon (public)' }),
+      el('input', { class: 'input', id: 'su-key', value: c.key, placeholder: 'eyJhbGciOiJIUzI1NiIs…', autocapitalize: 'off', spellcheck: 'false' }),
+      el('span', { class: 'hint', text: 'É a chave pública, feita para ficar no navegador. Não use a service_role.' }),
+    ]));
+    const erro = el('p', { class: 'gate__erro', role: 'alert', hidden: true });
+    const prog = el('div', { class: 'setup__prog', hidden: true }, [
+      el('div', { class: 'prog', html: '<div class="prog__bar" style="width:0"></div>' }),
+      el('p', { class: 'tiny dim', id: 'su-prog-txt', text: '' }),
+    ]);
+    const enviar = el('button', { class: 'btn btn--primary btn--lg btn--block', type: 'submit', html: `${icon('check')}Conectar` });
+    form.append(erro, enviar, prog);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = $('#su-url', form).value.trim().replace(/\/+$/, '');
+      const key = $('#su-key', form).value.trim();
+      if (!url || !key) return falhar('Preencha os dois campos.');
+      erro.hidden = true;
+      enviar.disabled = true;
+      enviar.innerHTML = 'Conectando…';
+      global.Cloud.setConfig({ url, key });
+      try {
+        await global.Cloud.testar();
+        await St().startSync();
+        /* o que já existia neste navegador sobe junto, inclusive as imagens */
+        const pendentes = St().contarMidiaLocal();
+        if (pendentes) {
+          prog.hidden = false;
+          await St().migrarMidias((i, t, nome) => {
+            $('.prog__bar', prog).style.width = `${Math.round((i / t) * 100)}%`;
+            $('#su-prog-txt', prog).textContent = `Enviando as imagens deste navegador: ${i + 1} de ${t} — ${nome}`;
+          });
+        }
+        /* Não entra sozinho: este é o único momento em que a configuração
+           aparece por inteiro, e é ela que faz o resto da equipe entrar
+           ligada. Sair daqui sem copiar seria voltar ao problema. */
+        /* a partir daqui só interessa o que falta fazer */
+        passos.remove();
+        form.remove();
+        antes.remove();
+        resgate?.remove();
+        intro.remove();
+        box.append(el('div', {
+          class: 'setup__ok', html: `
+          <div class="verdict" data-status="aprovado" style="margin-bottom:var(--s-4)">
+            <span class="verdict__icon">${icon('checkCircle')}</span>
+            <span><b>Conectado${pendentes ? ` — ${global.U.plural(pendentes, 'imagem enviada', 'imagens enviadas')}` : ''}.</b><br>
+            <span class="tiny dim">Falta um passo para a equipe: publicar esta configuração no site.</span></span>
+          </div>`,
+        }));
+        mostrarConfigJs(box);
+        box.append(el('p', {
+          class: 'hint', style: 'text-align:left',
+          html: 'No repositório <b>Bracerumpark-Aprovacoes</b>, abra <b>config.js</b>, substitua o conteúdo pelo bloco acima e salve. Quem abrir o site depois disso entra direto — sem ver esta tela.',
+        }));
+        box.append(el('button', {
+          class: 'btn btn--primary btn--lg btn--block',
+          html: `${icon('arrowR')}Já copiei — entrar no aplicativo`,
+          onclick: () => { instalando = false; App.render(); },
+        }));
+      } catch (err) {
+        enviar.disabled = false;
+        enviar.innerHTML = `${icon('check')}Conectar`;
+        prog.hidden = true;
+        falhar(err.message);
+      }
+    });
+
+    function falhar(msg) {
+      erro.textContent = msg;
+      erro.hidden = false;
+      global.U.animate(form, [
+        { transform: 'translateX(0)' }, { transform: 'translateX(-7px)' },
+        { transform: 'translateX(6px)' }, { transform: 'translateX(0)' },
+      ], { duration: 260 });
+    }
+
+    box.append(form);
+
+    /* nada do que já existe aqui pode se perder por causa da instalação */
+    const guardado = St().get().posts.length;
+    let resgate = null;
+    if (guardado) {
+      resgate = el('div', { class: 'row', style: 'justify-content:center' }, [
+        el('button', {
+          class: 'btn btn--ghost btn--sm',
+          html: `${icon('download')}Baixar ${global.U.plural(guardado, 'peça guardada', 'peças guardadas')} neste navegador`,
+          onclick: () => App.exportAll(),
+        }),
+      ]);
+      box.append(resgate);
+    }
+    document.body.append(tela);
+    setTimeout(() => $('#su-url', form)?.focus(), 120);
+  }
+
+  /** O trecho pronto para colar no config.js do repositório. */
+  function mostrarConfigJs(onde) {
+    const c = global.Cloud.config();
+    const texto = `window.APROVA_CONFIG = {\n`
+      + `  url: '${c.url}',\n`
+      + `  key: '${c.key}',\n`
+      + `  table: '${c.table}',\n`
+      + `  bucket: '${c.bucket}',\n`
+      + `  workspace: '${c.workspace}',\n};\n`;
+    const bloco = el('div', { class: 'stack stack--sm', style: 'width:100%;text-align:left' });
+    bloco.append(el('span', { class: 'label', text: 'Cole isto em config.js e publique — é o que faz todo mundo entrar já conectado' }));
+    bloco.append(el('pre', { class: 'code-bloco', text: texto }));
+    bloco.append(el('button', {
+      class: 'btn btn--sm', html: `${icon('copy')}Copiar o config.js`,
+      onclick: () => { navigator.clipboard?.writeText(texto); global.UI.toast('Copiado.', 'ok'); },
+    }));
+    onde.append(bloco);
+    return bloco;
+  }
+  App.mostrarConfigJs = mostrarConfigJs;
+
   /* ================================================== porta de entrada == */
   function portao() {
     $('#app').hidden = true;
@@ -414,7 +592,7 @@
     box.append(contas);
 
     box.append(el('p', { class: 'tiny dim', style: 'max-width:56ch',
-      text: 'Acesso sem senha: o e-mail identifica quem está revisando, não autentica. Os dados ficam neste navegador.' }));
+      text: 'Acesso sem senha: o e-mail identifica quem está revisando, não autentica. O trabalho fica no servidor da equipe — todo mundo vê o mesmo.' }));
 
     gate.append(box);
     document.body.append(gate);
@@ -559,7 +737,7 @@ create policy "aprova midia troca" on storage.objects
     }, { passive: true });
 
     /* puxa o que a equipe já tem antes de desenhar qualquer coisa */
-    St().startSync();
+    if (global.Cloud.isOn()) St().startSync().then(() => App.render());
     global.addEventListener('aprova:sync', (e) => {
       if (e.detail?.erro) global.UI.toast('Sincronização falhou: ' + e.detail.erro, 'err', 7000);
     });

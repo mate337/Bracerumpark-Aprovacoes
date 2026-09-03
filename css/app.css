@@ -1103,8 +1103,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 @media (max-width: 900px) { .sync-lbl { display: none; } }
 
 /* passo a passo dentro de um modal */
-.passos { margin: 0; padding-left: 20px; display: grid; gap: var(--s-2); font-size: var(--t-sm); color: var(--txt-2); }
-.passos li { line-height: 1.5; }
+/* lista numerada de verdade: em display:grid os marcadores somem, e aqui o
+   número do passo é a informação principal */
+.passos { margin: 0; padding-left: 22px; font-size: var(--t-sm); color: var(--txt-2); }
+.passos li { line-height: 1.55; margin-bottom: var(--s-2); padding-left: 4px; }
+.passos li::marker { color: var(--brand-lift); font-weight: 700; }
 .passos code {
   font-family: var(--font-mono); font-size: var(--t-2xs);
   background: var(--bg-sunken); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
@@ -1113,3 +1116,19 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 /* barra de progresso do envio de mídias */
 .prog { height: 8px; border-radius: 99px; background: var(--bg-sunken); border: 1px solid var(--line-soft); overflow: hidden; }
 .prog__bar { height: 100%; background: var(--grad-brand); transition: width var(--d-3) var(--e-out); }
+
+/* tela de instalação — o aplicativo não abre sem um lugar comum para gravar */
+.setup { max-width: 620px; }
+.setup .passos { text-align: left; width: 100%; }
+.passos--grande { font-size: var(--t-body); gap: var(--s-3); }
+.passos--grande a { color: var(--brand-lift); text-decoration: underline; text-underline-offset: 2px; }
+.setup__prog { display: grid; gap: var(--s-2); width: 100%; }
+.setup__ok { width: 100%; }
+.code-bloco {
+  margin: 0; padding: var(--s-3); border-radius: var(--r-sm); overflow-x: auto;
+  background: var(--bg-sunken); border: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: var(--t-2xs); line-height: 1.6; color: var(--txt-2);
+  white-space: pre; -webkit-user-select: all; user-select: all;
+}
+.chip--ok { background: rgba(47,211,154,.1); border-color: rgba(47,211,154,.28); color: var(--ok); cursor: pointer; }
+.chip--ok:hover { background: rgba(47,211,154,.18); }

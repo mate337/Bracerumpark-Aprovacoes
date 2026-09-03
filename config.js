@@ -1,21 +1,25 @@
 /* ==========================================================================
-   APROVA — configuração de compartilhamento (opcional)
+   APROVA — para onde o aplicativo grava
 
-   Sem isto preenchido, o aplicativo funciona normalmente, mas cada navegador
-   tem a sua própria cópia: o que você cria não aparece para mais ninguém.
+   Estes dois valores ligam o site ao servidor da equipe. Enquanto estiverem
+   vazios, o aplicativo NÃO abre: mostra a tela de instalação, que guia o passo
+   a passo e devolve este mesmo bloco pronto para colar aqui.
 
-   Para todos verem as mesmas postagens, crie um projeto gratuito no Supabase
-   (supabase.com), rode o SQL que está no README e cole aqui os dois valores
-   de Project Settings → API.
+   Não existe modo local. Conteúdo preso no navegador de uma pessoa não serve
+   para aprovar nada — foi o que motivou esta decisão.
+
+   Como preencher: crie um projeto gratuito no Supabase (supabase.com), rode o
+   SQL que a tela de instalação entrega e copie, em Project Settings → API, a
+   Project URL e a chave "anon public".
 
    A chave "anon" é pública de propósito — ela vai para o navegador de quem
-   abrir o site. Quem protege os dados são as políticas (RLS) do SQL do README,
-   não o segredo da chave. NÃO cole aqui a chave "service_role".
+   abrir o site. Quem protege os dados são as políticas (RLS) criadas pelo SQL,
+   não o sigilo da chave. NUNCA cole aqui a chave "service_role".
    ========================================================================== */
 window.APROVA_CONFIG = {
   url: '',              // https://xxxxxxxx.supabase.co
   key: '',              // chave anon (public)
-  table: 'aprova_docs', // tabela criada pelo SQL do README
+  table: 'aprova_docs', // criada pelo SQL da instalação
   bucket: 'aprova',     // bucket de mídias, público para leitura
   workspace: 'bracerum',// permite mais de uma equipe no mesmo projeto
 };

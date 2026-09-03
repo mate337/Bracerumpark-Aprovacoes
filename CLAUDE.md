@@ -84,7 +84,11 @@ js/app.js        roteador por hash, navegação, atalhos, paleta de comandos
 ## Sincronização
 
 `js/cloud.js` fala com um projeto Supabase por REST (sem SDK, sem dependência).
-É **opcional**: `config.js` vazio = tudo em `localStorage`, como antes.
+**Não é opcional e não existe modo local.** Com `config.js` vazio, `desenhar()`
+mostra a tela de instalação (`telaInstalacao`) e nada mais roda — nem o login.
+Se for mexer nisso, mantenha a rota de resgate: a tela oferece baixar o que já
+existe no navegador antes de qualquer coisa, e a conexão migra as mídias em
+base64 sozinha.
 
 - O recorte compartilhado é `Store.syncDoc()` — tudo menos `settings` e
   `currentUserId`, que são preferências de cada pessoa.
@@ -98,6 +102,11 @@ js/app.js        roteador por hash, navegação, atalhos, paleta de comandos
   leitura**, senão o `<img>` não carrega (não dá para mandar header em `<img>`).
 - O SQL de instalação vive em `App.SQL_SUPABASE`, em `js/app.js`, e é o mesmo
   texto que o botão "Copiar o SQL" entrega.
+- A flag `instalando` em `js/app.js` impede que um `aprova:change` disparado
+  pela própria conexão redesenhe por cima da tela de instalação antes de a
+  pessoa copiar o `config.js`.
+- Sem rede o aplicativo segue funcionando com o cache e sobe depois; isso é
+  resiliência, não "modo local" — não reintroduza a ideia na interface.
 
 ## Idioma
 

@@ -1649,68 +1649,76 @@
     /* dados */
     /* --------------------------------------------- compartilhamento ---- */
     const cloud = global.Cloud;
-    const ligado = cloud.isOn();
-    const sinc = painelSimples('Compartilhamento', ligado ? 'globe' : 'lock');
+    const est = cloud.status();
     const locais = St().contarMidiaLocal();
+    const sinc = painelSimples('Compartilhamento', 'globe');
 
     sinc.body.append(el('div', {
-      class: 'verdict', 'data-status': ligado ? 'aprovado' : 'alteracoes', html: `
-      <span class="verdict__icon">${icon(ligado ? 'globe' : 'lock')}</span>
+      class: 'verdict', 'data-status': est.erro ? 'alteracoes' : 'aprovado', html: `
+      <span class="verdict__icon">${icon(est.erro ? 'alert' : 'globe')}</span>
       <span style="min-width:0">
-        <span class="h3" style="display:block">${ligado ? 'Sincronizado' : 'Somente neste navegador'}</span>
-        <span class="tiny dim">${ligado
-          ? esc(`${cloud.config().url.replace(/^https?:\/\//, '')} · equipe “${cloud.config().workspace}”`)
-          : 'O que você cria aqui não aparece para mais ninguém — nem para você em outro navegador ou em janela anônima.'}</span>
+        <span class="h3" style="display:block">${est.erro ? 'Reconectando' : 'Tudo em equipe'}</span>
+        <span class="tiny dim">${esc(`${cloud.config().url.replace(/^https?:\/\//, '')} · equipe “${cloud.config().workspace}”`)}</span>
       </span>`,
     }));
 
-    if (!ligado) {
-      sinc.body.append(el('p', {
+    sinc.body.append(el('dl', {
+      class: 'meta-grid', html: `
+      <dt>Última troca</dt><dd>${est.em ? esc(global.U.ago(est.em)) : '<span class="dim">agora mesmo</span>'}</dd>
+      <dt>Estado</dt><dd>${est.erro
+        ? `<span style="color:var(--danger)">${esc(est.erro)}</span><br><span class="tiny dim">As mudanças ficam guardadas aqui e sobem quando a conexão voltar.</span>`
+        : 'as peças, os comentários e as imagens estão no servidor da equipe'}</dd>
+      <dt>Imagens pendentes</dt><dd>${locais
+        ? `<b style="color:var(--warn)">${locais}</b> ainda não subiram`
+        : 'nenhuma — todas no servidor'}</dd>`,
+    }));
+
+    const acoes = el('div', { class: 'row row--wrap' });
+    if (locais) {
+      acoes.append(el('button', {
+        class: 'btn btn--primary',
+        html: `${icon('upload')}Enviar ${global.U.plural(locais, 'imagem pendente', 'imagens pendentes')}`,
+        onclick: () => migrarMidias(),
+      }));
+    }
+    acoes.append(el('button', {
+      class: 'btn', html: `${icon('refresh')}Sincronizar agora`,
+      onclick: async () => {
+        try {
+          const r = await cloud.pull();
+          if (r) St().mergeRemote(r.doc);
+          await cloud.push(St().syncDoc());
+          global.UI.toast('Sincronizado.', 'ok');
+          global.App.render();
+        } catch (e) { global.UI.toast('Falhou: ' + e.message, 'err', 7000); }
+      },
+    }));
+    if (St().isAdmin()) {
+      acoes.append(el('button', {
+        class: 'btn btn--ghost', html: `${icon('settings')}Trocar servidor`, onclick: () => configurarNuvem(),
+      }));
+    }
+    sinc.body.append(acoes);
+
+    /* o trecho do config.js, para quem for publicar o site */
+    if (St().isAdmin()) {
+      const det = el('details');
+      det.append(el('summary', { class: 'label', style: 'cursor:pointer', text: 'Configuração para publicar no repositório' }));
+      const dentro = el('div', { style: 'margin-top:var(--s-3)' });
+      global.App.mostrarConfigJs(dentro);
+      dentro.append(el('p', {
         class: 'hint',
-        text: 'Para a equipe ver as mesmas postagens é preciso um lugar comum. O aplicativo fala com um projeto Supabase (plano gratuito), configurado uma vez.',
+        text: 'Enquanto isto não estiver no config.js publicado, cada pessoa precisa colar a configuração no próprio navegador.',
       }));
-      sinc.body.append(el('div', { class: 'row row--wrap' }, [
-        el('button', { class: 'btn btn--primary', html: `${icon('globe')}Configurar compartilhamento`, onclick: () => configurarNuvem() }),
-        el('button', { class: 'btn', html: `${icon('copy')}Copiar o SQL da instalação`, onclick: () => copiarSQL() }),
-      ]));
-    } else {
-      const st = cloud.status();
-      sinc.body.append(el('dl', {
-        class: 'meta-grid', html: `
-        <dt>Última troca</dt><dd>${st.em ? esc(global.U.ago(st.em)) : '<span class="dim">ainda não</span>'}</dd>
-        <dt>Estado</dt><dd>${st.erro ? `<span style="color:var(--danger)">${esc(st.erro)}</span>` : 'tudo certo'}</dd>
-        <dt>Mídias locais</dt><dd>${locais ? `<b style="color:var(--warn)">${locais}</b> ainda só neste navegador` : 'nenhuma pendente'}</dd>`,
-      }));
-      const acoes = el('div', { class: 'row row--wrap' });
-      if (locais) {
-        acoes.append(el('button', {
-          class: 'btn btn--primary',
-          html: `${icon('upload')}Enviar ${global.U.plural(locais, 'mídia local', 'mídias locais')}`,
-          onclick: () => migrarMidias(),
-        }));
-      }
-      acoes.append(el('button', {
-        class: 'btn', html: `${icon('refresh')}Verificar agora`,
-        onclick: async () => {
-          try {
-            const r = await cloud.pull();
-            if (r) St().mergeRemote(r.doc);
-            global.UI.toast('Sincronizado.', 'ok');
-          } catch (e) { global.UI.toast('Falhou: ' + e.message, 'err', 6000); }
-        },
-      }));
-      acoes.append(el('button', {
-        class: 'btn btn--ghost', html: `${icon('settings')}Trocar configuração`, onclick: () => configurarNuvem(),
-      }));
-      sinc.body.append(acoes);
+      det.append(dentro);
+      sinc.body.append(det);
     }
     cabeca.after(sinc.panel);
-
     /* --------------------------------------------------------- dados --- */
     const d = painelSimples('Cópia dos dados', 'folder');
     d.body.append(el('p', {
       class: 'hint',
-      text: 'A cópia leva as postagens, os comentários e as imagens enviadas — dá para restaurar em outro navegador sem reenviar arquivo nenhum.',
+      text: 'O trabalho já vive no servidor da equipe. Isto é o backup: a cópia leva as postagens, os comentários e as imagens, e pode ser importada de volta se algo der errado.',
     }));
     d.body.append(el('div', { class: 'row row--wrap' }, [
       el('button', { class: 'btn btn--primary', html: `${icon('download')}Baixar cópia completa`, onclick: () => global.App.exportAll() }),
@@ -1719,8 +1727,8 @@
       el('button', {
         class: 'btn btn--danger', html: `${icon('refresh')}Apagar tudo`,
         onclick: () => global.UI.confirm({
-          title: 'Apagar tudo deste navegador?', danger: true, ok: 'Apagar',
-          text: 'Postagens, comentários e decisões deste navegador serão apagados. Baixe uma cópia antes.',
+          title: 'Apagar tudo?', danger: true, ok: 'Apagar',
+          text: 'Apaga as peças deste navegador e, na próxima sincronização, do servidor da equipe — para todo mundo. Baixe uma cópia antes.',
           onOk: () => { St().reset(); global.UI.toast('Dados apagados.', 'ok'); },
         }),
       }),

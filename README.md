@@ -4,8 +4,8 @@ Aplicativo web para o ciclo **criar → revisar → aprovar → agendar** de pos
 Instagram, Facebook e LinkedIn, com ou sem impulsionamento. Roda sem servidor, sem
 build e sem dependência externa.
 
-Por padrão os dados ficam no `localStorage` — **por navegador**. Para a equipe
-inteira ver as mesmas peças, ligue o compartilhamento (abaixo).
+Tudo funciona em conjunto o tempo todo: as peças, os comentários e as imagens
+ficam num servidor comum, e todo mundo vê o mesmo. **Não há modo local.**
 
 ## Como abrir
 
@@ -24,60 +24,50 @@ projeto é estático, não precisa de build.
 
 ---
 
-## Onde os dados ficam
+## Instalação (uma vez, ~5 min)
 
-Há dois modos, e o aplicativo diz em qual está por um selo no topo:
-
-| Selo | O que significa |
-|---|---|
-| 🔒 **só aqui** | Tudo vive no `localStorage` deste navegador. Ninguém mais vê, nem você em janela anônima ou em outro aparelho. Limpar o cache apaga. |
-| 🌐 **em equipe** | As peças, os comentários e as imagens ficam num projeto Supabase. Todo mundo que abrir o site vê o mesmo. |
-
-### Ligar o compartilhamento (uma vez, ~5 min)
+O aplicativo precisa de um lugar para gravar. Enquanto `config.js` estiver
+vazio, ele **não abre** — mostra a tela de instalação, que conduz o processo:
 
 1. Crie um projeto gratuito em **supabase.com**.
-2. **SQL Editor** → cole e rode o SQL que o aplicativo entrega em
-   **Ajustes → Compartilhamento → Copiar o SQL da instalação**. Ele cria a tabela
-   `aprova_docs`, o bucket `aprova` e as permissões.
-3. **Project Settings → API** → copie a *Project URL* e a chave *anon public*.
-4. Em **Ajustes → Configurar compartilhamento**, cole os dois e clique em
-   **Testar e salvar**.
-5. Para todo mundo já entrar conectado, cole os mesmos valores em `config.js`
-   e publique. Sem isso, cada pessoa teria de configurar no próprio navegador.
+2. **SQL Editor → New query**: cole o SQL que a tela entrega no botão
+   *Copiar o SQL da instalação* e rode. Ele cria a tabela `aprova_docs`, o
+   bucket `aprova` e as permissões.
+3. **Project Settings → API**: copie a *Project URL* e a chave *anon public*.
+4. Cole as duas na tela e clique em **Conectar**.
+5. A tela devolve o bloco pronto do `config.js`. **Cole no repositório e
+   publique** — é isso que faz o resto da equipe entrar já conectada, sem ver
+   a instalação.
 
-A chave `anon` é pública de propósito: ela vai para o navegador de quem abrir o
-site. Quem protege os dados são as políticas (RLS) do SQL, não o sigilo da chave.
-**Nunca coloque a `service_role` no `config.js`.** As políticas que o SQL cria são
-permissivas — qualquer pessoa com o link lê e grava. Serve para uma equipe pequena
-com o link fechado; para algo mais sério, troque por políticas com `auth.uid()`.
+Se você já tinha peças e imagens neste navegador, elas sobem **automaticamente**
+no passo 4, imagens inclusive. Ninguém reenvia arquivo.
 
-### E as imagens que já subi?
+A chave `anon` é pública por natureza: ela vai para o navegador de quem abrir o
+site. Quem protege os dados são as políticas (RLS) do SQL, não o sigilo da
+chave. **Nunca coloque a `service_role` no `config.js`.** As políticas que o SQL
+cria são permissivas — qualquer pessoa com o link lê e grava. Serve para uma
+equipe pequena com o link fechado; para algo mais sério, troque por políticas
+com `auth.uid()`.
 
-Se você criou peças antes de ligar o compartilhamento, as imagens estão em base64
-dentro do `localStorage`. Em **Ajustes → Compartilhamento** aparece
-**"Enviar N mídias locais"**: o aplicativo sobe cada uma para o armazenamento
-compartilhado e troca o endereço na peça. **Ninguém reenvia arquivo nenhum.**
-
-### Cópia dos dados
+## Backup
 
 **Ajustes → Cópia dos dados → Baixar cópia completa** gera um JSON com as
-postagens, os comentários e **as imagens embutidas**. Serve de backup e de
-mudança de navegador: em outro aparelho, **Importar cópia** traz tudo de volta.
-Na importação, *mesclar* resolve cada peça pela edição mais recente e *substituir*
-troca o conteúdo local inteiro.
+postagens, os comentários e **as imagens embutidas**. É rede de segurança, não
+um modo de trabalho: o trabalho vive no servidor. *Importar cópia* traz o
+arquivo de volta, mesclando pela edição mais recente ou substituindo tudo.
 
-Se você ainda está no modo "só aqui", **baixe uma cópia antes de limpar o cache**.
-
-### Como a sincronização se comporta
+## Como a sincronização se comporta
 
 - O que sobe: postagens, comentários, decisões, acervo, contas e a marca.
 - O que fica local: tema, dispositivo do preview e quem está logado — são
   preferências de cada pessoa.
 - Cada navegador confere o servidor a cada 10 segundos e ao voltar para a aba.
 - A junção é **por peça**: vence a versão editada por último. Duas pessoas em
-  postagens diferentes não se atrapalham; duas pessoas na *mesma* peça ao mesmo
-  tempo, sim — a última gravação vence.
+  postagens diferentes não se atrapalham; duas na *mesma* peça ao mesmo tempo,
+  sim — a última gravação vence.
 - Exclusões deixam marca, para não voltarem na próxima sincronização.
+- Sem rede, o aplicativo continua funcionando com o que tem em mãos e sobe as
+  mudanças quando a conexão volta. O selo no topo mostra o estado.
 
 ## Entrar
 
@@ -214,7 +204,7 @@ Sem framework e sem build — a mesma stack do site do parque.
 ```
 .
 ├── index.html
-├── config.js           URL e chave do Supabase (vazio = modo local)
+├── config.js           URL e chave do Supabase (vazio = o app mostra a instalação)
 ├── assets/             renders do parque usados na demonstração
 ├── css/
 │   ├── tokens.css      design system: cor, tipo, espaço, raio, sombra, motion
@@ -254,8 +244,8 @@ navegação no celular para o polegar alcançar.
   de confiança, o passo seguinte é Supabase Auth com políticas por `auth.uid()`.
 - **Junção simples.** A sincronização resolve conflitos por peça, pela edição mais
   recente. Não há edição simultânea de campo, como num editor colaborativo.
-- **Sem compartilhamento configurado, os dados são do navegador.** Limpar o cache
-  apaga tudo o que não tiver cópia.
+- **A instalação depende de você.** Criar o projeto no Supabase exige uma conta;
+  é o único passo que não dá para automatizar.
 - **A ferramenta começa vazia.** Não há conteúdo de demonstração: as peças são as
   que a equipe criar. O acervo de renders do parque continua disponível no
   compositor.
