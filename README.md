@@ -26,21 +26,19 @@ projeto é estático, não precisa de build.
 
 ## Instalação
 
-O aplicativo precisa de um lugar para gravar. Enquanto a **chave** faltar em
-`config.js`, ele **não abre** — mostra a tela de instalação, que conduz o resto.
+**Já está feita.** O `config.js` aponta para o projeto **BracerumParkAprova**
+(`kddungxbtibpzcphmtna`), a tabela e o bucket existem e as peças estão lá. Quem
+abrir o site entra direto no login.
 
-O projeto já está apontado: **BracerumParkAprova**
-(`https://kddungxbtibpzcphmtna.supabase.co`). Falta:
+A chave publicada é a **publishable** (`sb_publishable_…`), que é feita para
+ficar no navegador de quem abre o site. Quem protege os dados são as políticas
+(RLS) de [`supabase/instalacao.sql`](supabase/instalacao.sql), não o sigilo da
+chave. **Nunca publique a secreta** (`sb_secret_…` / `service_role`) — a tela de
+instalação recusa se alguém tentar colar uma.
 
-1. **SQL Editor → New query**: cole o conteúdo de
-   [`supabase/instalacao.sql`](supabase/instalacao.sql) — o mesmo que a tela
-   entrega no botão *Copiar o SQL da instalação* — e clique em **Run**. Ele cria
-   a tabela `aprova_docs`, o bucket `aprova` e as permissões.
-2. **Project Settings → API**: copie a chave **anon public**.
-3. Cole a chave na tela de instalação e clique em **Conectar**.
-4. A tela devolve o bloco pronto do `config.js`. **Cole no repositório e
-   publique** — é isso que faz o resto da equipe entrar já conectada, sem ver
-   a instalação.
+Para apontar para outro projeto: **Ajustes → Compartilhamento → Trocar
+servidor**, ou apague a `key` do `config.js` e o aplicativo volta a mostrar a
+instalação, que conduz o passo a passo e devolve o bloco pronto para colar.
 
 Se você já tinha peças e imagens neste navegador, elas sobem **automaticamente**
 no passo 4, imagens inclusive. Ninguém reenvia arquivo.
@@ -249,8 +247,9 @@ navegação no celular para o polegar alcançar.
   de confiança, o passo seguinte é Supabase Auth com políticas por `auth.uid()`.
 - **Junção simples.** A sincronização resolve conflitos por peça, pela edição mais
   recente. Não há edição simultânea de campo, como num editor colaborativo.
-- **A chave depende de você.** Ela fica no painel do Supabase, atrás do login da
-  conta — é o passo que não dá para automatizar daqui.
+- **As políticas são permissivas.** Quem tiver o link do site lê e grava. Serve
+  para a equipe com o endereço fechado; para algo público, troque por políticas
+  com `auth.uid()`.
 - **A ferramenta começa vazia.** Não há conteúdo de demonstração: as peças são as
   que a equipe criar. O acervo de renders do parque continua disponível no
   compositor.

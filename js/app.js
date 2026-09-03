@@ -390,11 +390,11 @@
     const passos = el('ol', { class: 'passos passos--grande' });
     passos.innerHTML = jaTemUrl
       ? `<li>No projeto, abra <b>SQL Editor</b> → <b>New query</b>, cole o SQL do botão abaixo e clique em <b>Run</b>.</li>
-         <li>Abra <b>Project Settings → API</b> e copie a chave <b>anon public</b>.</li>
+         <li>Abra <b>Project Settings → API</b> e copie a chave <b>publishable</b> (<code>sb_publishable_…</code>) — em projetos mais antigos ela se chama <b>anon public</b> e começa com <code>eyJ</code>.</li>
          <li>Cole a chave aqui embaixo. O endereço do projeto já veio configurado.</li>`
       : `<li>Crie um projeto gratuito em <b><a href="https://supabase.com/dashboard/new" target="_blank" rel="noopener">supabase.com</a></b> (leva ~2 minutos, inclui o e-mail de confirmação).</li>
          <li>No projeto, abra <b>SQL Editor</b> → <b>New query</b>, cole o SQL do botão abaixo e clique em <b>Run</b>.</li>
-         <li>Abra <b>Project Settings → API</b> e copie a <b>Project URL</b> e a chave <b>anon public</b>.</li>
+         <li>Abra <b>Project Settings → API</b> e copie a <b>Project URL</b> e a chave <b>publishable</b> (ou <b>anon public</b>, nos projetos mais antigos).</li>
          <li>Cole as duas aqui embaixo.</li>`;
     box.append(passos);
 
@@ -415,9 +415,9 @@
       el('input', { class: 'input', id: 'su-url', value: c.url, placeholder: 'https://xxxxxxxx.supabase.co', autocapitalize: 'off', spellcheck: 'false' }),
     ]));
     form.append(el('div', { class: 'field' }, [
-      el('label', { class: 'label', for: 'su-key', text: 'Chave anon (public)' }),
-      el('input', { class: 'input', id: 'su-key', value: c.key, placeholder: 'eyJhbGciOiJIUzI1NiIs…', autocapitalize: 'off', spellcheck: 'false' }),
-      el('span', { class: 'hint', text: 'É a chave pública, feita para ficar no navegador. Não use a service_role.' }),
+      el('label', { class: 'label', for: 'su-key', text: 'Chave pública (publishable / anon)' }),
+      el('input', { class: 'input', id: 'su-key', value: c.key, placeholder: 'sb_publishable_…  ou  eyJhbGciOiJIUzI1NiIs…', autocapitalize: 'off', spellcheck: 'false' }),
+      el('span', { class: 'hint', text: 'É a chave feita para ficar no navegador. Nunca a secreta (sb_secret_… / service_role).' }),
     ]));
     const erro = el('p', { class: 'gate__erro', role: 'alert', hidden: true });
     const prog = el('div', { class: 'setup__prog', hidden: true }, [
@@ -431,7 +431,9 @@
       e.preventDefault();
       const url = $('#su-url', form).value.trim().replace(/\/+$/, '');
       const key = $('#su-key', form).value.trim();
-      if (!url || !key) return falhar('Preencha os dois campos.');
+      if (!url) return falhar('Falta o endereço do projeto.');
+      const ver = global.Cloud.checarChave(key);
+      if (!ver.ok) return falhar(ver.motivo);
       erro.hidden = true;
       enviar.disabled = true;
       enviar.innerHTML = 'Conectando…';
@@ -492,6 +494,8 @@
       ], { duration: 260 });
     }
 
+    /* digitar limpa o aviso anterior — senão a mensagem velha confunde */
+    form.addEventListener('input', () => { erro.hidden = true; });
     box.append(form);
 
     /* nada do que já existe aqui pode se perder por causa da instalação */

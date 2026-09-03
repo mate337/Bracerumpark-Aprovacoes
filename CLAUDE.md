@@ -103,8 +103,12 @@ base64 sozinha.
 - O SQL de instalação vive em `App.SQL_SUPABASE`, em `js/app.js`, e é o mesmo
   texto que o botão "Copiar o SQL" entrega. Uma cópia fica em
   `supabase/instalacao.sql` — se mudar um, gere o outro a partir dele.
-- O projeto é o **BracerumParkAprova** (`kddungxbtibpzcphmtna`). A URL já está em
-  `config.js`; só a chave anon fica de fora, porque exige o painel do Supabase.
+- O projeto é o **BracerumParkAprova** (`kddungxbtibpzcphmtna`), já configurado em
+  `config.js` com a chave **publishable**. Ela é pública por natureza — vai para
+  o navegador de todo mundo. `Cloud.checarChave()` recusa `sb_secret_` e JWT com
+  `role: service_role` antes de gravar; não afrouxe essa checagem.
+- Testar a sincronização aqui exige um servidor de mentira que fale a API do
+  Supabase: o navegador do sandbox não tem saída para a internet.
 - `.mcp.json` registra o servidor MCP do Supabase para sessões locais do Claude
   Code. Ele exige autenticação por OAuth (`claude /mcp`), que não roda em sessão
   remota — não conte com ele aqui.

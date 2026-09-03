@@ -1760,9 +1760,9 @@
             el('input', { class: 'input', id: 'nu-url', value: c.url, placeholder: 'https://xxxx.supabase.co' }),
           ]));
           b.append(el('div', { class: 'field' }, [
-            el('label', { class: 'label', for: 'nu-key', text: 'Chave anon (public)' }),
-            el('input', { class: 'input', id: 'nu-key', value: c.key, placeholder: 'eyJhbGciOi…' }),
-            el('span', { class: 'hint', text: 'É a chave pública, feita para ficar no navegador. Não use a service_role.' }),
+            el('label', { class: 'label', for: 'nu-key', text: 'Chave pública (publishable / anon)' }),
+            el('input', { class: 'input', id: 'nu-key', value: c.key, placeholder: 'sb_publishable_… ou eyJhbGciOi…' }),
+            el('span', { class: 'hint', text: 'Nunca a secreta (sb_secret_… / service_role).' }),
           ]));
           b.append(el('div', { class: 'field' }, [
             el('label', { class: 'label', for: 'nu-ws', text: 'Equipe' }),
@@ -1781,6 +1781,8 @@
             onclick: async (e) => {
               const m = e.target.closest('.modal');
               const btn = e.target.closest('button');
+              const ver = global.Cloud.checarChave(m.querySelector('#nu-key').value);
+              if (!ver.ok) return global.UI.toast(ver.motivo, 'err', 9000);
               btn.disabled = true; btn.innerHTML = 'Testando…';
               global.Cloud.setConfig({
                 url: m.querySelector('#nu-url').value.trim().replace(/\/+$/, ''),

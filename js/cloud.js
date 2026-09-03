@@ -46,6 +46,36 @@
     ultimoPull = null;
   }
 
+  /**
+   * Confere se a chave colada é a pública. A secreta ignora as permissões do
+   * banco — num site estático, colar ela seria entregar o banco a quem abrir o
+   * navegador. Melhor recusar do que confiar na atenção de quem cola.
+   */
+  function checarChave(chave) {
+    const k = String(chave || '').trim();
+    if (!k) return { ok: false, motivo: 'Cole a chave.' };
+    if (/^sb_secret_/i.test(k)) {
+      return { ok: false, motivo: 'Essa é a chave secreta (sb_secret_…). Use a publishable (sb_publishable_…) ou a anon public.' };
+    }
+    if (/^sb_publishable_/i.test(k)) return { ok: true, tipo: 'publishable' };
+    /* antes do teste de JWT: um endereço também tem três partes separadas por
+       ponto e passaria batido */
+    if (/^https?:\/\//i.test(k) || /\.supabase\.(co|in)\b/i.test(k)) {
+      return { ok: false, motivo: 'Isso é o endereço do projeto, não a chave. A chave fica logo abaixo, em Project Settings → API.' };
+    }
+    if (k.split('.').length === 3) {
+      try {
+        const corpo = JSON.parse(atob(k.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (corpo.role === 'service_role') {
+          return { ok: false, motivo: 'Essa é a service_role — ela ignora todas as permissões. Use a chave anon public.' };
+        }
+        if (corpo.role === 'anon') return { ok: true, tipo: 'anon' };
+      } catch (e) { /* não é um JWT legível; segue para a checagem final */ }
+      return { ok: true, tipo: 'jwt' };
+    }
+    return { ok: false, motivo: 'Não parece uma chave do Supabase. Ela começa com “sb_publishable_” ou com “eyJ”.' };
+  }
+
   const cabecalhos = () => ({
     apikey: cfg.key,
     Authorization: `Bearer ${cfg.key}`,
@@ -175,5 +205,5 @@
     return true;
   }
 
-  global.Cloud = { isOn, config, setConfig, clearConfig, pull, push, uploadMedia, start, stop, status, testar, dataUrlParaBlob };
+  global.Cloud = { isOn, config, setConfig, clearConfig, pull, push, uploadMedia, start, stop, status, testar, checarChave, dataUrlParaBlob };
 })(window);
