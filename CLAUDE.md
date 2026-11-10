@@ -118,6 +118,13 @@ base64 sozinha.
 - Sem rede o aplicativo segue funcionando com o cache e sobe depois; isso é
   resiliência, não "modo local" — não reintroduza a ideia na interface.
 
+## `docs/cv/` — fora do aplicativo
+
+Tabela de cadastro dos lotes industriais para o **CV CRM** (`unidades_3_loteamento_confrontacoes.csv`),
+com as confrontações Norte/Sul/Leste/Oeste da cláusula 6.2 do contrato. Não tem relação com o APROVA:
+mora aqui porque o repositório do site (`mate337/BracerumPark`) não aceita push desta conta. O gerador
+lê os dados do checkout do site (`--site`); regras e pendências em `docs/cv/README.md`.
+
 ## Idioma
 
 Interface e código em **português do Brasil**, incluindo nomes de funções internas
