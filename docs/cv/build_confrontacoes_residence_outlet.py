@@ -41,7 +41,8 @@ FAIXA_RES = {r: 'área verde' for r in bc.RUMOS}
 # Entre a fachada do Outlet / das lojas LJ e a rua há 10 a 20 m de calçada e estacionamento (V14).
 ALCANCE_OUT = 25.0
 bc.MARCOS.update({'portaria resort': 'portaria do Resort', 'salão de festas': 'salão de festas do Resort',
-                  'outlet fase 2': FASE2})
+                  'outlet fase 2': FASE2, 'vestiário': 'Bracerum Club', 'bar': 'Bracerum Club',
+                  'salão de eventos': 'Bracerum Club'})
 
 
 def retangulo(x0, y0, x1, y1):
@@ -194,10 +195,27 @@ def extrair(site):
 
 
 # ============================================================================== confrontação das torres
+def faixas(torres):
+    """['T24', 'T25', 'T26', 'T32', 'T33'] → 'T24 a T26, T32 e T33'."""
+    ns, grupos = sorted(int(t[1:]) for t in torres), []
+    for n in ns:
+        if grupos and n == grupos[-1][-1] + 1:
+            grupos[-1].append(n)
+        else:
+            grupos.append([n])
+    partes = []
+    for g in grupos:
+        partes += [f'T{g[0]:02d} a T{g[-1]:02d}'] if len(g) > 2 else [f'T{n:02d}' for n in g]
+    return bc.junta(partes)
+
+
 def confronta_torres(site, T, condominios):
     """A torre fica na área comum do condomínio: em cada rumo, o que ela tem em frente — outra torre do mesmo
     condomínio, ou, saindo do condomínio, a rua e o que há do outro lado."""
-    pl = bc.Planta(site, unidades=T, ignorar=('galpão', 'torre', 'torre1'), faixa=FAIXA_RES)
+    # do outro lado da rua, outro condomínio do Residence vai pelo nome das torres dele
+    vizinhos = [dict(nome='condomínio das Torres ' + faixas(q['torres']), P=[tuple(p) for p in q['P']])
+                for q in condominios]
+    pl = bc.Planta(site, unidades=T, extras=vizinhos, ignorar=('galpão', 'torre', 'torre1'), faixa=FAIXA_RES)
     cond_de = {t: q['P'] for q in condominios for t in q['torres']}
     idx = bc.Grade([dict(t) for t in T])
     textos = {}

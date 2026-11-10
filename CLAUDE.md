@@ -122,7 +122,9 @@ base64 sozinha.
 
 Tabela de cadastro dos lotes industriais para o **CV CRM** (`unidades_3_loteamento_confrontacoes.csv`),
 com as confrontações Norte/Sul/Leste/Oeste da cláusula 6.2 do contrato e os quatro vértices de cada
-lote em lat/lon (coordenadas preliminares do Anexo III). Não tem relação com o APROVA:
+lote em lat/lon (coordenadas preliminares do Anexo III); `build_confrontacoes_residence_outlet.py` faz o
+mesmo para as casas e os aptos (pela torre) do Residence e para o Outlet e o Supermercado, a partir das
+tabelas de importação em `base_cv/`. Não tem relação com o APROVA:
 mora aqui porque o repositório do site (`mate337/BracerumPark`) não aceita push desta conta. O gerador
 lê os dados do checkout do site (`--site`); regras e pendências em `docs/cv/README.md`.
 

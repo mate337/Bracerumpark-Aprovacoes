@@ -138,3 +138,56 @@ lotes (`Norte/Sul/Leste/Oeste (Confrontação)` e `Vértice NO/NE/SE/SO (Coorden
 `geometria_v14_residence.json` guarda o que foi lido do PDF (lotes do Resort e contorno dos condomínios), para a
 geração normal levar segundos. Reler: `--extrair` (~5 min; precisa de pdftoppm, pdftotext, numpy, scipy,
 opencv e pdfplumber).
+
+## Exemplos
+
+| Unidade | Norte | Sul | Leste | Oeste |
+|---|---|---|---|---|
+| Casa `Q04.L05` (Resort) | Divisa do parque | Via interna | Lote LT.RES.Q04.L06 | Lote LT.RES.Q04.L04 |
+| Casa `Q03.L02` (Resort) | Via interna | Via interna | Simulador de Surf | Lote LT.RES.Q03.L01 |
+| Apto da `Torre T24` | Área comum do condomínio, em frente: Torre T25 | Área comum do condomínio, em frente: via interna (do outro lado: condomínio das Torres T21 a T23, T30, T31 e T36 a T38) | Área comum do condomínio, em frente: Torre T32 | Área comum do condomínio, em frente: via interna (do outro lado: condomínio das Torres T13 a T20) |
+| Loja `OUT-01` | Loja OUT-02 | Outlet Premium — 2ª fase (liberação futura) | Circulação do Outlet | Via interna (do outro lado: faixa verde e Rodovia PY-19) |
+| Loja `OUT-25` | Loja OUT-26 | Loja OUT-24 | Lote Q04.L014 | Circulação do Outlet |
+| `LJ6` | Via interna | Supermercado | Passagem entre LJ6 e LJ7 | Loja LJ5 |
+
+## Regras de cada conjunto
+
+**Casas (Resort).** Os 31 lotes são lidos do PDF: o miolo branco de cada lote, entre os traços, em volta do
+rótulo `LT.RES. Qxx.Lyy`; o polígono é afastado 0,25 m (meio traço) e os cantos comuns a vizinhos são
+unificados. A área fechada pelos vértices fica entre **−1,1% e +0,6%** da área do CV em 30 lotes. A
+exceção é a **Q03.L04**: o desenho tem **838 m²** e o CV (e o rótulo do PDF) dizem 769 — é o trapézio
+cortado pela diagonal; conferir com quem desenhou. Os lotes da Q04 encostam direto na **divisa do parque**
+(a diagonal) e o L01 no paisagismo; o "Simulador de Surf" ocupa o vão da Q03 entre o L02 e o L03.
+Nos lotes girados da Q04 (a ~45°) dois cantos caem no mesmo quadrante: a coluna NO leva o canto mais a
+noroeste e os demais seguem no sentido horário — é a distribuição de menor desvio.
+
+**Aptos (torres).** Apartamento não tem divisa própria no masterplan, então as oito colunas descrevem **a
+torre**, iguais para todos os aptos dela: os vértices são o retângulo da projeção da torre (planta em H) e a
+confrontação diz o que a torre tem **em frente**, atravessando a área comum: outra torre do mesmo condomínio
+ou, saindo do condomínio, a rua e o que há do outro lado (outro condomínio, pelo nome das torres, o Resort,
+o Club, a divisa…). A numeração T01–T67 é a **proposta** que está no CV (o kit comercial não numera as
+torres): refeita na planta de 02/11, cada torre cai a 0,1 m de onde estava. Os 9 condomínios são os
+contornos fechados do PDF; o das torres T01–T12 não é fechado no desenho e foi montado com os traços dele
+(`CONDOMINIO_T01_T12` no script).
+
+**Outlet Premium, 1ª fase.** As 57 lojas são as do desenho de vendas do cliente (numeração OUT-01…57 do
+`build_tabela_cv.py`). O desenho está em escala com o V14: o contorno da 1ª fase cai no do V14 com
+0,8093 e 0,8085 m/px nos dois eixos, e a Fase 2 horizontal do desenho cai a 0,1 m da do V14 — usado
+0,8089 m/px. Partes comuns do desenho com nome: circulação (o corredor de 8,1 m entre as fileiras), acessos,
+doca e sanitários. A fileira de trás encosta, sem rua, nos **lotes Q04.L011–L017** (e a tabela dos lotes diz
+"Bracerum Outlet Premium" do lado deles).
+
+**Supermercado + LJ1–LJ12.** Do PDF vetorial: bloco de 65,49 × 83,02 m, supermercado com 55,49 m (4.606,8 m²)
+e a faixa de lojas com 10,00 m em módulos de 6,00 m — LJ1–LJ6, passagem de 11 m, LJ7–LJ12 (60 m² cada).
+O lado oeste encosta na 2ª fase do Outlet.
+
+## Pendências — Residence e Outlet
+
+- **Outlet: 17.102 m² × 17.870 m².** Pelo encaixe no V14 as 57 lojas somam 17.102 m²; o CV traz 17.870 m²
+  (o número "Área vendável 1ª fase" do desenho), 4,5% a mais. Para fechar 17.870 a escala do desenho teria
+  de ser 2,2% maior e o Outlet passaria do contorno da 1ª fase do V14, entrando na Q04. Os vértices seguem
+  o V14; as áreas do CV não foram mexidas. Confirmar com o cliente se os 17.870 m² incluem áreas comuns.
+- **Casa Q03.L04: 838 m² no desenho × 769 m² no CV.**
+- **Torres:** numeração ainda é proposta — trocar quando o cliente mandar a planta numerada (o script refaz
+  tudo). As confrontações dos aptos são as da torre; a posição do apto no andar não está no masterplan.
+- Coordenadas preliminares, pelos mesmos motivos dos lotes (encaixe na PY-19 do OpenStreetMap).
