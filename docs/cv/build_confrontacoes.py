@@ -3,9 +3,15 @@
 
 Mesma tabela do `unidades_3_loteamento.csv` (modelo de importação do CV: 126 colunas, `;`, UTF-8 com
 BOM, vírgula decimal, mesmos códigos internos 302QQLL), refeita com o **Masterplan V14 rev. 02/11/2026**
-e com quatro colunas a mais no fim — **Norte, Sul, Leste e Oeste (Confrontação)** — para preencher
+e com oito colunas a mais no fim — **Norte, Sul, Leste e Oeste (Confrontação)** e os quatro cantos,
+**Vértice NO, NE, SE e SO (Coordenada)** — para preencher
 
+    6.1. … conforme croqui e coordenadas preliminares constantes do Anexo III.
     6.2. Confrontações preliminares: ao Norte, [___]; ao Sul, [___]; ao Leste, [___]; ao Oeste, [___].
+
+**Os vértices** são o polígono do lote afastado 0,3 m (metade do vão de 0,6 m que o desenho deixa entre
+dois lotes, ou seja, o eixo da divisa), com os cantos comuns a vizinhos unificados, em lat/lon WGS 84.
+A posição absoluta é tão boa quanto o encaixe da planta na PY-19 do OpenStreetMap — preliminar.
 
 De onde vem cada coisa (tudo do repositório do site, `mate337/BracerumPark`):
   * lotes, nomes oficiais, áreas de contrato e polígonos: `3dmasterplan/data/lotes.json`
@@ -38,7 +44,12 @@ KX = 111320 * math.cos(math.radians(LAT_PARK))
 
 RUMOS = 'NLSO'
 NOME_RUMO = {'N': 'Norte', 'L': 'Leste', 'S': 'Sul', 'O': 'Oeste'}
-COLUNAS_NOVAS = [f'{NOME_RUMO[r]} (Confrontação)' for r in 'NSLO']
+CANTOS = ['NO', 'NE', 'SE', 'SO']                # sentido horário no mapa, a partir do noroeste
+COLUNAS_NOVAS = ([f'{NOME_RUMO[r]} (Confrontação)' for r in 'NSLO']
+                 + [f'Vértice {c} (Coordenada)' for c in CANTOS])
+FOLGA = 0.3     # m: o desenho deixa 0,6 m entre dois lotes; o canto do lote é o eixo dessa linha
+JUNTA = 1.0     # m: cantos de lotes vizinhos mais perto que isso são o mesmo ponto (em lado
+                #    inclinado a folga desloca o canto ~0,75 m; cantos distintos ficam a mais de 2 m)
 
 PASSO = 0.5                              # m, ao andar para fora do lote
 SONDA_LOTE = 1.5                         # m: o vão desenhado entre dois lotes é < 1 m
@@ -213,6 +224,75 @@ class Planta:
         return lados, comp
 
 
+# ------------------------------------------------------------------------------------- vértices
+def expande(P, d):
+    """Afasta cada lado do polígono `d` metros para fora e devolve os novos cantos."""
+    n, linhas = len(P), []
+    for i in range(n):
+        (x1, y1), (x2, y2) = P[i], P[(i + 1) % n]
+        Ln = math.hypot(x2 - x1, y2 - y1)
+        ux, uy = (x2 - x1) / Ln, (y2 - y1) / Ln
+        nx, ny = uy, -ux
+        if dentro(((x1 + x2) / 2 + nx * .3, (y1 + y2) / 2 + ny * .3), P):
+            nx, ny = -nx, -ny
+        linhas.append(((x1 + nx * d, y1 + ny * d), (ux, uy)))
+    out = []
+    for i in range(n):
+        (a, u), (b, v) = linhas[i - 1], linhas[i]
+        cr = u[0] * v[1] - u[1] * v[0]
+        if abs(cr) < 1e-6:                      # lados colineares: só desloca o canto
+            out.append(b)
+            continue
+        t = ((b[0] - a[0]) * v[1] - (b[1] - a[1]) * v[0]) / cr
+        out.append((a[0] + u[0] * t, a[1] + u[1] * t))
+    return out
+
+
+def vertices(pl, lotes):
+    """{id: [(X, Y) dos cantos NO, NE, SE, SO]} na prancha, com os cantos comuns a vizinhos unificados."""
+    cantos = {l['id']: expande(l['P'], FOLGA) for l in lotes}
+    # une os cantos que caem no mesmo ponto (o mesmo marco serve aos dois, três ou quatro lotes)
+    todos = [(i, k) for i, cs in cantos.items() for k in range(len(cs))]
+    pai = {t: t for t in todos}
+
+    def raiz(t):
+        while pai[t] != t:
+            pai[t] = pai[pai[t]]
+            t = pai[t]
+        return t
+    grade = collections.defaultdict(list)
+    for t in todos:
+        x, y = cantos[t[0]][t[1]]
+        grade[int(x // 2), int(y // 2)].append(t)
+    for (gx, gy), ts in grade.items():
+        viz = [u for dx in (-1, 0, 1) for dy in (-1, 0, 1) for u in grade.get((gx + dx, gy + dy), ())]
+        for t in ts:
+            for u in viz:
+                if t < u and math.dist(cantos[t[0]][t[1]], cantos[u[0]][u[1]]) < JUNTA:
+                    pai[raiz(t)] = raiz(u)
+    grupos = collections.defaultdict(list)
+    for t in todos:
+        grupos[raiz(t)].append(cantos[t[0]][t[1]])
+    media = {g: (sum(x for x, _ in ps) / len(ps), sum(y for _, y in ps) / len(ps)) for g, ps in grupos.items()}
+
+    out = {}
+    for i, cs in cantos.items():
+        cs = [media[raiz((i, k))] for k in range(len(cs))]
+        en = [(x * pl.E[0] + y * pl.E[1], x * pl.N[0] + y * pl.N[1]) for x, y in cs]   # leste, norte
+        area = sum(en[k][0] * en[(k + 1) % len(en)][1] - en[(k + 1) % len(en)][0] * en[k][1] for k in range(len(en)))
+        ordem = list(range(len(cs)))
+        if area > 0:                            # anti-horário com o norte para cima → inverte
+            ordem.reverse()
+        k0 = max(ordem, key=lambda k: en[k][1] - en[k][0])          # o mais a noroeste
+        ordem = ordem[ordem.index(k0):] + ordem[:ordem.index(k0)]
+        out[i] = [cs[k] for k in ordem]
+    return out
+
+
+def area_m2(cs):
+    return abs(sum(cs[k][0] * cs[(k + 1) % len(cs)][1] - cs[(k + 1) % len(cs)][0] * cs[k][1] for k in range(len(cs)))) / 2
+
+
 # ------------------------------------------------------------------------------------- texto
 def junta(itens):
     return itens[0] if len(itens) == 1 else ', '.join(itens[:-1]) + ' e ' + itens[-1]
@@ -326,6 +406,10 @@ def main():
                 if t == 'lote' and ('lote', a) not in filtra(lados_de[b][OPOSTO[r]]):
                     lados_de[b][OPOSTO[r]][('lote', a)] = max(lados_de[b][OPOSTO[r]][('lote', a)], TRECHO_MIN)
 
+    vert = vertices(pl, pl.lotes)
+    assert all(len(v) == len(CANTOS) for v in vert.values()), 'lote que não é quadrilátero'
+    razao = sorted(area_m2(vert[l['id']]) / l['a'] for l in pl.lotes)
+
     linhas, conf, avisos = [], [], []
     for l in sorted(pl.lotes, key=lambda l: l['id']):
         lados = lados_de[l['id']]
@@ -360,6 +444,8 @@ def main():
                                             f"US$ {pm}/m² — janela {jan['curto']['pt']}, 1 a 8 lotes, 20% + 12x"),
             'Latitude (Unidade)': f'{lat:.6f}', 'Longitude (Unidade)': f'{lon:.6f}',
             **{f'{NOME_RUMO[rr]} (Confrontação)': txt[rr] for rr in RUMOS},
+            **{f'Vértice {c} (Coordenada)': '{:.6f}, {:.6f}'.format(*pl.latlon(*v))
+               for c, v in zip(CANTOS, vert[l['id']])},
         })
         for k, v in campos.items():
             r[col[k]] = v
@@ -377,6 +463,8 @@ def main():
     print(f'Fonte: {pl.fonte}')
     print(f'{len(linhas)} lotes, {sum(l["a"] for l in pl.lotes):,} m², janela {jan["id"]} → {os.path.relpath(SAIDA)}')
     print(f'Frentes do nome ≠ ruas da planta: {len(conf)} lotes → {os.path.relpath(SAIDA_CONF)}')
+    print(f'Área pelos vértices ÷ área de contrato: mediana {razao[len(razao) // 2]:.3f}, '
+          f'de {razao[0]:.3f} a {razao[-1]:.3f}')
     print(f'Avisos: {len(avisos)}')
     for a in avisos:
         print('  ' + a)

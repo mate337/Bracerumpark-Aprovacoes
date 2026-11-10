@@ -1,9 +1,10 @@
 # Cadastro dos lotes para o CV — com as confrontações da cláusula 6.2 (2026-11-10)
 
 `unidades_3_loteamento_confrontacoes.csv` é a mesma tabela de cadastro do `unidades_3_loteamento.csv`
-(pasta "Lotes + Categorias" do Drive), refeita com o **Masterplan V14 rev. 02/11/2026** e com quatro
-colunas a mais no fim, uma por rumo, para preencher o contrato:
+(pasta "Lotes + Categorias" do Drive), refeita com o **Masterplan V14 rev. 02/11/2026** e com oito
+colunas a mais no fim, para preencher o contrato:
 
+> **6.1.** … conforme croqui e **coordenadas preliminares** constantes do Anexo III.
 > **6.2.** Confrontações preliminares: ao Norte, [___]; ao Sul, [___]; ao Leste, [___]; ao Oeste, [___].
 
 | Coluna nova | Exemplo (Q07.L014) |
@@ -12,6 +13,13 @@ colunas a mais no fim, uma por rumo, para preencher o contrato:
 | `Sul (Confrontação)` | Lote Q07.L013 |
 | `Leste (Confrontação)` | Via interna |
 | `Oeste (Confrontação)` | Lote Q07.L006 |
+| `Vértice NO (Coordenada)` | -25.783358, -57.728569 |
+| `Vértice NE (Coordenada)` | -25.783271, -57.728080 |
+| `Vértice SE (Coordenada)` | -25.783491, -57.728033 |
+| `Vértice SO (Coordenada)` | -25.783577, -57.728521 |
+
+As colunas `Latitude (Unidade)` / `Longitude (Unidade)` do modelo do CV continuam como estavam: são o
+**centro** do lote, iguais às do cadastro anterior.
 
 **O que não mudou:** o formato (modelo de importação do CV, 126 colunas, `;`, UTF-8 com BOM, vírgula
 decimal), o empreendimento/etapa/bloco, e os **códigos internos** — `302` + quadra + lote
@@ -31,6 +39,26 @@ importação de 2026-11-10 (`docs/cv/` do repositório do site): só vai para o 
 | `Bracerum Outlet Premium` | sem rua no meio: os fundos da Q04 encostam no Outlet |
 
 As ruas não têm nome no V14, por isso "via interna". Quando o loteamento tiver nomes de rua, basta trocar o texto.
+
+## Os vértices (coordenadas do Anexo III)
+
+Os quatro cantos de cada lote, em **latitude, longitude (WGS 84, graus decimais)**, na ordem do
+sentido horário no mapa a partir do canto noroeste: NO → NE → SE → SO. Nos 573 lotes retangulares
+cada rótulo é o canto daquele quadrante; nos 41 poligonais (esquinas da diagonal, Q31, Q38–Q40) é o
+mais próximo dele — conferido: todos os rótulos caem no quadrante certo em relação ao centro do lote.
+
+- **O canto fica no eixo da linha de divisa.** O desenho deixa 0,6 m entre dois lotes; cada polígono é
+  afastado 0,3 m para fora, e os cantos que caem no mesmo ponto (até 1,0 m) viram um ponto só. Resultado:
+  **lotes vizinhos têm exatamente a mesma coordenada no canto comum** (253 pontos servem a 4 lotes, 644
+  a 2, 156 são canto externo de quadra) — dá para desenhar o croqui do Anexo III direto da tabela.
+- **Conferência pela área:** a área fechada pelos quatro cantos fica entre **−1,9% e +0,8%** da área de
+  contrato em 613 lotes (mediana 0,0%) — ex.: Q07.L014 sai com 50,0 × 24,8 m. A exceção é a **Q04.L017**:
+  o desenho tem **1.639 m²** e o nome oficial diz 1.410 — reforça os 1.650 m² da pendência abaixo.
+- **Precisão: são preliminares, como diz o contrato.** A posição *relativa* (um lote em relação ao outro)
+  é a do desenho, ~1 m. A posição *absoluta* não é levantamento: a planta foi posta no mapa encaixando a
+  dobra da PY-19 do desenho na curva real do OpenStreetMap (`build_refs.py` do site). Pode estar deslocada
+  de alguns metros a algumas dezenas de metros no terreno. As definitivas vêm do plano de mensura do
+  agrimensor (no Paraguai, normalmente em UTM 21S).
 
 ## Como é calculado
 
@@ -84,7 +112,8 @@ O nome de cada lote no V14 já traz as frentes (`LTIND.Q07.L014.A01250.ESQNAO.RT
   quatro últimas antes de importar (ou criar campos adicionais no CV com esses nomes).
 - **"Uso previsto" (fim do 6.2) não está na tabela**: depende do comprador (industrial / logístico /
   serviços); nada no masterplan diz isso por lote.
-- **Medidas dos lados não entram**: os polígonos vêm da planta rasterizada e erram ~3% (Q07.L014 sai com
-  24,1 × 49,3 m para 1.250 m² de contrato). Para o contrato, só com o plano de mensura.
+- **Medidas dos lados não têm coluna própria**: saem dos vértices (Q07.L014 → 50,0 × 24,8 m), mas são de
+  desenho. Para o contrato, só com o plano de mensura.
 - A soma das áreas é **766.449 m²**; o quadro da prancha diz 766.690 m² (a diferença é a Q04.L017 com
-  1.650) — já anotado como "a confirmar" no repositório do site.
+  1.650) — já anotado como "a confirmar" no repositório do site. O desenho da Q04.L017 mede 1.639 m², o
+  que aponta para 1.650.
