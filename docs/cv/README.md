@@ -117,3 +117,24 @@ O nome de cada lote no V14 já traz as frentes (`LTIND.Q07.L014.A01250.ESQNAO.RT
 - A soma das áreas é **766.449 m²**; o quadro da prancha diz 766.690 m² (a diferença é a Q04.L017 com
   1.650) — já anotado como "a confirmar" no repositório do site. O desenho da Q04.L017 mede 1.639 m², o
   que aponta para 1.650.
+
+---
+
+# Bracerum Residence e Bracerum Outlet — mesmas colunas (2026-11-10)
+
+Quatro tabelas no mesmo formato, geradas por `build_confrontacoes_residence_outlet.py` a partir das tabelas de
+importação do CV feitas em 2026-11-10 (`base_cv/`, do `build_tabela_cv.py` do branch
+`claude/beautiful-babbage-imqfjx` do site): **mesmas linhas, ids do CV, nomes, áreas e valores**, com
+`Latitude`/`Longitude (Unidade)` preenchidas (centro da unidade — estavam vazias) e as mesmas oito colunas dos
+lotes (`Norte/Sul/Leste/Oeste (Confrontação)` e `Vértice NO/NE/SE/SO (Coordenada)`).
+
+| Arquivo | Unidades | De onde vem a geometria |
+|---|---|---|
+| `unidades_residence_casas_confrontacoes.csv` | 31 lotes do Resort (Q01–Q04) | os lotes `LT.RES.Qxx.Lyy` separados no PDF do V14 rev. 02/11 (miolo branco entre os traços, afastado 0,25 m até o eixo do traço) |
+| `unidades_residence_aptos_confrontacoes.csv` | 1.452 aptos em 67 torres | **a torre**: retângulo da projeção do volume do `scene.json`; todos os aptos da torre têm as mesmas oito colunas |
+| `unidades_outlet_premium_1a_fase_confrontacoes.csv` | 57 lojas OUT-01…OUT-57 | o desenho de vendas do cliente encaixado no contorno da 1ª fase do V14 |
+| `unidades_outlet_supermercado_lojas_confrontacoes.csv` | Supermercado + LJ1–LJ12 | as medidas do PDF vetorial do V14 |
+
+`geometria_v14_residence.json` guarda o que foi lido do PDF (lotes do Resort e contorno dos condomínios), para a
+geração normal levar segundos. Reler: `--extrair` (~5 min; precisa de pdftoppm, pdftotext, numpy, scipy,
+opencv e pdfplumber).

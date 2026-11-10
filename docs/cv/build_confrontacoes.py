@@ -31,7 +31,7 @@ conferência (`conferencia_frentes.csv`) — na Q38/Q39 os rótulos do PDF traze
 Uso:
     python3 docs/cv/build_confrontacoes.py [--site ../BracerumPark] [--hoje AAAA-MM-DD]
 """
-import argparse, collections, csv, datetime, json, math, os, sys
+import argparse, collections, csv, datetime, itertools, json, math, os, re, sys
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 MODELO = os.path.join(AQUI, 'modelo_unidades_cv.csv')
@@ -116,7 +116,11 @@ class Grade:
 
 
 class Planta:
-    def __init__(self, site):
+    """A planta para as sondagens. `unidades` é o conjunto cujos vizinhos se procuram (padrão: os lotes
+    industriais); `extras` são áreas com nome que valem mais que os prédios do scene.json (ex.: a Fase 2
+    do Outlet); `ignorar` são tipos de volume que são só ilustração (galpão, casa...)."""
+
+    def __init__(self, site, unidades=None, extras=(), ignorar=('galpão',), faixa=None, alcance=ALCANCE_DIRETO):
         d = os.path.join(site, '3dmasterplan', 'data')
         from PIL import Image                                    # pip install pillow
         self.cena = json.load(open(os.path.join(d, 'scene.json'), encoding='utf-8'))
@@ -126,13 +130,20 @@ class Planta:
         self.k = self.img.size[0] / self.cena['sheet'][0]
         A = self.cena['A']
         self.N, self.E = (math.cos(A), math.sin(A)), (-math.sin(A), math.cos(A))   # y da prancha para baixo
-        self.lotes = [dict(l, P=pontos(l['p'])) for l in lj['lotes']]
-        fora = [dict(q, P=pontos(q['p'])) for q in lj['quadras'] if q['q'] in ('Q11', 'Q37')]
-        for q in fora:
-            q['t'] = 'Q11' if q['q'] == 'Q11' else 'Q37'
-        vols = [dict(v, P=pontos(v['p'])) for v in self.cena['vol'] if v['t'] != 'galpão']   # galpão = ilustração
-        self.i_lotes, self.i_vols = Grade(self.lotes), Grade(vols + fora)
+        self.lotes = [dict(l, P=pontos(l['p']), rot='Lote ' + l['id']) for l in lj['lotes']]
+        extras = list(extras) + [dict(nome={'Q11': 'Administração', 'Q37': 'recinto alfandegado (Q37)'}[q['q']],
+                                      P=pontos(q['p'])) for q in lj['quadras'] if q['q'] in ('Q11', 'Q37')]
+        if unidades is None:
+            self.unidades = self.lotes
+        else:                                    # outro conjunto: lote industrial encostado vira vizinho com nome
+            self.unidades = unidades
+            extras += [dict(nome=l['rot'], P=l['P']) for l in self.lotes]
+        self.rot = {u['id']: u['rot'] for u in self.unidades}
+        vols = [dict(v, P=pontos(v['p'])) for v in self.cena['vol'] if v['t'] not in ignorar]
+        self.i_lotes, self.i_extras, self.i_vols = Grade(self.unidades), Grade(extras), Grade(vols)
         self.contorno = pontos(self.cena['contorno'])          # divisa do parque na prancha
+        self.faixa = FAIXA_VERDE if faixa is None else faixa    # rua → gramado → fim do parque, por rumo
+        self.alcance = alcance                   # até onde procurar a rua (Outlet: calçada de ~15 m na frente)
 
     def latlon(self, X, Y):
         W, H = self.cena['sheet']
@@ -163,10 +174,13 @@ class Planta:
         """(lote encontrado ou None, nome do marco ou None)."""
         o = self.i_lotes.em(pt, lote)
         if o:
-            return o, 'quadra:' + o['q']
+            return o, 'quadra:' + o.get('q', '')
+        o = self.i_extras.em(pt)
+        if o:
+            return None, o['nome']
         o = self.i_vols.em(pt)
         if o and not self.asfalto(pt):          # o volume do scene.json às vezes avança sobre a rua
-            return None, {'Q11': 'Administração', 'Q37': 'recinto alfandegado (Q37)'}.get(o['t'], MARCOS.get(o['t'], o['t']))
+            return None, MARCOS.get(o['t'], o['t'])
         return None, None
 
     def sonda(self, lote, px, py, nx, ny):
@@ -179,7 +193,8 @@ class Planta:
         corrida, verde, via_em, verde_visto, st = 0.0, 0.0, None, False, PASSO
         while True:
             q = (px + nx * st, py + ny * st)
-            if via_em is not None and not dentro(q, self.contorno):
+            fora = not dentro(q, self.contorno)
+            if via_em is not None and fora:
                 return 'via', 'faixa verde' if verde_visto else 'divisa do parque'
             o, m = self.marco(q, lote)
             if m:
@@ -187,10 +202,15 @@ class Planta:
                     return ('lote', o['id']) if o else ('direto', m)
                 return 'via', m
             if via_em is None:
+                if fora:                               # encosta na divisa sem rua no meio (Resort, Q04)
+                    return 'direto', 'divisa do parque'
+                verde = verde + PASSO if self.gramado(q) else 0.0
+                if verde >= VERDE_MIN:                 # encosta em área verde sem rua no meio
+                    return 'direto', 'área verde'
                 corrida = corrida + PASSO if self.asfalto(q) else 0.0
                 if corrida >= VIA_MIN:
-                    via_em = st
-                elif st > ALCANCE_DIRETO + VIA_MIN:
+                    via_em, verde = st, 0.0
+                elif st > self.alcance + VIA_MIN:
                     return '?', ''
             else:
                 verde = verde + PASSO if self.gramado(q) else 0.0
@@ -201,10 +221,30 @@ class Planta:
             st += PASSO
         return ('via', 'área verde' if verde_visto else '') if via_em is not None else ('?', '')
 
+    def rumos_dos_lados(self, P):
+        """Rumo de cada lado pela normal externa. Num quadrilátero, um lado por rumo (a combinação que menos
+        se desvia): num trapézio cortado pela diagonal, o lado inclinado e o vizinho dele caíam no mesmo rumo."""
+        normais = []
+        for i in range(len(P)):
+            (x1, y1), (x2, y2) = P[i], P[(i + 1) % len(P)]
+            Ln = math.hypot(x2 - x1, y2 - y1) or 1
+            nx, ny = (y2 - y1) / Ln, -(x2 - x1) / Ln
+            if dentro(((x1 + x2) / 2 + nx * .3, (y1 + y2) / 2 + ny * .3), P):
+                nx, ny = -nx, -ny
+            normais.append((nx, ny))
+        rumos = [self.rumo(*n) for n in normais]
+        if len(P) == 4 and len(set(rumos)) < 4:
+            graus = [math.degrees(math.atan2(n[0] * self.E[0] + n[1] * self.E[1], n[0] * self.N[0] + n[1] * self.N[1])) % 360
+                     for n in normais]
+            desvio = lambda g, r: min(abs(g - 90 * RUMOS.index(r)) % 360, 360 - abs(g - 90 * RUMOS.index(r)) % 360)
+            rumos = list(min(itertools.permutations(RUMOS), key=lambda pr: sum(desvio(g, r) for g, r in zip(graus, pr))))
+        return rumos
+
     def confrontacoes(self, lote):
         P = lote['P']
         lados = {r: collections.Counter() for r in RUMOS}
         comp = collections.Counter()
+        rumos = self.rumos_dos_lados(P)
         for i in range(len(P)):
             (x1, y1), (x2, y2) = P[i], P[(i + 1) % len(P)]
             dx, dy = x2 - x1, y2 - y1
@@ -214,7 +254,7 @@ class Planta:
             nx, ny = dy / Ln, -dx / Ln
             if dentro(((x1 + x2) / 2 + nx * .3, (y1 + y2) / 2 + ny * .3), P):
                 nx, ny = -nx, -ny
-            r = self.rumo(nx, ny)
+            r = rumos[i]
             comp[r] += Ln
             n = max(4, int(Ln))
             for j in range(n):
@@ -248,9 +288,10 @@ def expande(P, d):
     return out
 
 
-def vertices(pl, lotes):
-    """{id: [(X, Y) dos cantos NO, NE, SE, SO]} na prancha, com os cantos comuns a vizinhos unificados."""
-    cantos = {l['id']: expande(l['P'], FOLGA) for l in lotes}
+def vertices(pl, lotes, folga=FOLGA, junta=JUNTA):
+    """{id: [(X, Y) dos cantos NO, NE, SE, SO]} na prancha, com os cantos comuns a vizinhos unificados.
+    `folga` afasta o polígono até o eixo da linha de divisa (0 quando ele já está no eixo)."""
+    cantos = {l['id']: expande(l['P'], folga) if folga else list(l['P']) for l in lotes}
     # une os cantos que caem no mesmo ponto (o mesmo marco serve aos dois, três ou quatro lotes)
     todos = [(i, k) for i, cs in cantos.items() for k in range(len(cs))]
     pai = {t: t for t in todos}
@@ -268,7 +309,7 @@ def vertices(pl, lotes):
         viz = [u for dx in (-1, 0, 1) for dy in (-1, 0, 1) for u in grade.get((gx + dx, gy + dy), ())]
         for t in ts:
             for u in viz:
-                if t < u and math.dist(cantos[t[0]][t[1]], cantos[u[0]][u[1]]) < JUNTA:
+                if t < u and math.dist(cantos[t[0]][t[1]], cantos[u[0]][u[1]]) < junta:
                     pai[raiz(t)] = raiz(u)
     grupos = collections.defaultdict(list)
     for t in todos:
@@ -306,26 +347,49 @@ def filtra(cont):
             if (v >= TRECHO_MIN or v >= total * .5) and (k[0] != '?' or v >= total * .5)}
 
 
-def texto(cont, rumo):
-    """Counter {(tipo, valor): metros} de um rumo → texto da cláusula e alertas."""
+PLURAL = {'Lote': 'Lotes', 'Loja': 'Lojas', 'Torre': 'Torres'}
+
+
+def natural(s):
+    return [int(p) if p.isdigit() else p for p in re.split(r'(\d+)', s)]
+
+
+def agrupa(nomes):
+    """['Lote Q01.L002', 'Lote Q01.L003', 'Supermercado'] → ['Lotes Q01.L002 e Q01.L003', 'Supermercado']."""
+    grupos = {}
+    for n in sorted(nomes, key=natural):
+        pre, _, cod = n.partition(' ')
+        if pre in PLURAL and cod:
+            grupos.setdefault(pre, []).append(cod)
+        else:
+            grupos.setdefault(n, None)
+    return [k if cods is None else (k if len(cods) == 1 else PLURAL[k]) + ' ' + junta(cods)
+            for k, cods in grupos.items()]
+
+
+def texto(cont, rumo, rot=None, faixa=None):
+    """Counter {(tipo, valor): metros} de um rumo → texto da cláusula e alertas. `rot`: id → nome."""
+    faixa = FAIXA_VERDE if faixa is None else faixa
     fica = filtra(cont)
-    lotes = sorted(v for (t, v) in fica if t == 'lote' and not v.startswith('quadra:'))
+    vizinhos = [(rot or {}).get(v, 'Lote ' + v) for (t, v) in fica if t == 'lote' and not v.startswith('quadra:')]
     alem = collections.Counter()
     for (t, v), m in fica.items():
         if t == 'via':
-            alem[FAIXA_VERDE.get(rumo, 'divisa do parque') if v == 'faixa verde' else v] += m
+            alem[faixa.get(rumo, 'divisa do parque') if v == 'faixa verde' else v] += m
     diretos = collections.Counter()
     for (t, v), m in fica.items():
         if t == 'direto':
             diretos[v] += m
     if alem:                                    # lado com rua: prédio "encostado" é o volume do scene.json
-        alem.update(diretos)                    # avançando sobre a calçada — conta como o que há em frente
+        for v in ('área verde', 'divisa do parque'):    # avançando sobre a calçada — conta como o que há
+            diretos.pop(v, None)                # em frente; gramado de calçada não conta
+        alem.update(diretos)
         diretos = collections.Counter()
     diretos = sorted(diretos)
     alerta = []
-    partes = []
-    if lotes:
-        partes.append(('Lote ' if len(lotes) == 1 else 'Lotes ') + junta(lotes))
+    # lote/loja/torre de outro conjunto encostado entra junto com os vizinhos ("Lotes Q04.L011 e Q04.L012")
+    partes = agrupa(vizinhos + [d for d in diretos if d.partition(' ')[0] in PLURAL])
+    diretos = [d for d in diretos if d.partition(' ')[0] not in PLURAL]
     if alem:
         frente = alem.most_common(1)[0][0]      # o que predomina do outro lado; outra quadra = nada a dizer
         partes.append('via interna' + (f' (do outro lado: {frente})' if frente and not frente.startswith('quadra:') else ''))
@@ -336,6 +400,31 @@ def texto(cont, rumo):
         alerta.append(f'{NOME_RUMO[rumo]}: encosta em quadra vizinha sem lote mapeado')
     s = junta(partes) if partes else ''
     return (s[:1].upper() + s[1:]), alerta
+
+
+OPOSTO = {'N': 'S', 'S': 'N', 'L': 'O', 'O': 'L'}
+
+
+def confronta(pl):
+    """Confrontações de todas as unidades da planta: ({id: {rumo: Counter}}, {id: {rumo: texto}}, avisos)."""
+    lados_de = {u['id']: pl.confrontacoes(u)[0] for u in pl.unidades}
+    # Reciprocidade: se A tem B ao Norte, B tem A ao Sul — uma divisa curta (2,8 m entre Q01.L001 e
+    # Q01.L005) passa no lado curto de um e cai no corte de quina do lado comprido do outro.
+    for a, lados in lados_de.items():
+        for r in RUMOS:
+            for (t, b) in filtra(lados[r]):
+                if t == 'lote' and b in lados_de and ('lote', a) not in filtra(lados_de[b][OPOSTO[r]]):
+                    lados_de[b][OPOSTO[r]][('lote', a)] = max(lados_de[b][OPOSTO[r]][('lote', a)], TRECHO_MIN)
+    textos, avisos = {}, []
+    for u in pl.unidades:
+        textos[u['id']] = {}
+        for r in RUMOS:
+            t, al = texto(lados_de[u['id']][r], r, pl.rot, pl.faixa)
+            textos[u['id']][r] = t
+            avisos += [f"{u['id']} — {a}" for a in al]
+            if not t:
+                avisos.append(f"{u['id']} — {NOME_RUMO[r]}: sem lado nesse rumo")
+    return lados_de, textos, avisos
 
 
 def frentes_do_nome(nome):
@@ -396,30 +485,15 @@ def main():
         'Tipo (Unidade)': 'Lote', 'Ativo no painel (Unidade)': 'Sim',
     }
 
-    lados_de = {l['id']: pl.confrontacoes(l)[0] for l in pl.lotes}
-    # Reciprocidade: se A tem B ao Norte, B tem A ao Sul — uma divisa curta (2,8 m entre Q01.L001 e
-    # Q01.L005) passa no lado curto de um e cai no corte de quina do lado comprido do outro.
-    OPOSTO = {'N': 'S', 'S': 'N', 'L': 'O', 'O': 'L'}
-    for a, lados in lados_de.items():
-        for r in RUMOS:
-            for (t, b) in filtra(lados[r]):
-                if t == 'lote' and ('lote', a) not in filtra(lados_de[b][OPOSTO[r]]):
-                    lados_de[b][OPOSTO[r]][('lote', a)] = max(lados_de[b][OPOSTO[r]][('lote', a)], TRECHO_MIN)
+    lados_de, textos, avisos = confronta(pl)
 
     vert = vertices(pl, pl.lotes)
     assert all(len(v) == len(CANTOS) for v in vert.values()), 'lote que não é quadrilátero'
     razao = sorted(area_m2(vert[l['id']]) / l['a'] for l in pl.lotes)
 
-    linhas, conf, avisos = [], [], []
+    linhas, conf = [], []
     for l in sorted(pl.lotes, key=lambda l: l['id']):
-        lados = lados_de[l['id']]
-        txt = {}
-        for r in RUMOS:
-            t, al = texto(lados[r], r)
-            txt[r] = t
-            avisos += [f"{l['id']} — {a}" for a in al]
-            if not t:
-                avisos.append(f"{l['id']} — {NOME_RUMO[r]}: sem lado nesse rumo")
+        txt = textos[l['id']]
         # conferência com as frentes do nome oficial
         ruas = {r for r in RUMOS if 'via interna' in txt[r].lower()}
         nome_fr = frentes_do_nome(l['nome'])
