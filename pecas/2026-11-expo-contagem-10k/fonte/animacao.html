@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Contagem 10.000 — story EXPO Paraguai-Brasil</title>
+<!--
+  Animação do story “Já são mais de 10.000 participantes ativos no evento”
+  (posts.ai, página 2), com fundo transparente.
+
+  Aberto direto no navegador, toca em loop sobre o branco da arte (barra de
+  espaço pausa). O renderizar.js chama quadro(t) segundo a segundo e grava
+  cada quadro sem fundo.
+
+  O texto não é fonte instalada: são os contornos tirados do .ai por
+  extrair.py (glifos.js), na posição exata de cada letra.
+-->
+<style>
+  html, body { margin: 0; background: transparent; }
+  body.previa { background: #fff; display: grid; place-items: center; min-height: 100vh; }
+  body.previa svg { height: 96vh; width: auto; outline: 1px solid #ddd; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<svg id="arte" xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920"></svg>
+<script src="glifos.js"></script>
+<script>
+'use strict';
+/* ------------------------------------------------------------- tempo --- */
+const FPS = 30;
+const DURACAO = 6;            // segundos; a arte fica parada do fim da contagem até aqui
+const META = 10000;
+const T = {
+  linha1:   { ini: 0.15, dur: 0.75 },   // “Já são mais de”
+  numero:   { ini: 0.40, dur: 0.75 },   // o número sobe para o lugar…
+  contagem: { ini: 0.40, dur: 2.60 },   // …e conta de 0 a 10.000
+  linha3:   { ini: 0.95, dur: 0.75 },   // “participantes”
+  linha4:   { ini: 1.10, dur: 0.75 },   // “ativos no evento”
+  pulso:    { ini: 3.00, dur: 0.50 },   // respiro quando chega em 10.000
+};
+
+const sai3 = (x) => 1 - Math.pow(1 - x, 3);          // desacelera
+const prog = (t, f) => Math.min(1, Math.max(0, (t - f.ini) / f.dur));
+const fmt = (n) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');   // 10000 → 10.000
+
+/* -------------------------------------------------------------- arte --- */
+const G = window.GLIFOS;
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('arte');
+const no = (tag, attrs = {}, pai) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (pai) pai.append(e);
+  return e;
+};
+const defs = no('defs', {}, svg);
+
+/* Cada linha mora numa janela (clipPath) e sobe de baixo para dentro dela. */
+function janela(id, linha, folgaCima, folgaBaixo) {
+  const cp = no('clipPath', { id }, defs);
+  no('rect', { x: 0, y: linha.base - folgaCima, width: 1080, height: folgaCima + folgaBaixo }, cp);
+  const fora = no('g', { 'clip-path': `url(#${id})` }, svg);
+  return no('g', {}, fora);
+}
+function desenhaGlifos(g, linha) {
+  const k = linha.corpo / 1000;
+  for (const gl of linha.glifos) {
+    no('path', { d: gl.d, transform: `translate(${gl.x} ${linha.base}) scale(${k} ${-k})` }, g);
+  }
+}
+
+const [L1, LN, L3, L4] = G.linhas;
+const camadas = {};
+for (const [nome, linha] of [['linha1', L1], ['linha3', L3], ['linha4', L4]]) {
+  const g = janela('j-' + nome, linha, linha.corpo * 1.0, linha.corpo * 0.3);
+  g.setAttribute('fill', linha.cor);
+  desenhaGlifos(g, linha);
+  camadas[nome] = { g, sobe: linha.corpo * 1.15 };
+}
+
+/* O número: dígitos tabulares (556/1000 cada, o ponto 278), alinhados pela
+   direita no mesmo ponto em que “10.000” termina na arte. */
+const centroNum = { x: (LN.x0 + LN.x1) / 2, y: LN.base - LN.corpo * 0.36 };
+const escalaNum = no('g', {}, svg);
+const numCp = no('clipPath', { id: 'j-numero' }, defs);
+no('rect', { x: 0, y: LN.base - LN.corpo * 0.86, width: 1080, height: LN.corpo * 1.0 }, numCp);
+const numJanela = no('g', { 'clip-path': 'url(#j-numero)' }, escalaNum);
+const numG = no('g', { fill: LN.cor }, numJanela);
+camadas.numero = { g: numG, sobe: LN.corpo * 0.95 };
+
+let ultimo = null;
+function escreveNumero(n) {
+  const s = fmt(n);
+  if (s === ultimo) return;
+  ultimo = s;
+  const k = LN.corpo / 1000;
+  const largura = [...s].reduce((a, ch) => a + G.digitos[ch].avanco, 0) * k;
+  let x = LN.x1 - largura;
+  numG.replaceChildren();
+  for (const ch of s) {
+    no('path', { d: G.digitos[ch].d, transform: `translate(${x.toFixed(3)} ${LN.base}) scale(${k} ${-k})` }, numG);
+    x += G.digitos[ch].avanco * k;
+  }
+}
+
+/* --------------------------------------------------------- um quadro --- */
+function revela(c, p) {
+  const e = sai3(p);
+  c.g.setAttribute('transform', `translate(0 ${((1 - e) * c.sobe).toFixed(3)})`);
+  c.g.setAttribute('opacity', Math.min(1, p / 0.55).toFixed(3));
+}
+
+window.quadro = function (t) {
+  revela(camadas.linha1, prog(t, T.linha1));
+  revela(camadas.numero, prog(t, T.numero));
+  revela(camadas.linha3, prog(t, T.linha3));
+  revela(camadas.linha4, prog(t, T.linha4));
+
+  const pc = prog(t, T.contagem);
+  escreveNumero(pc >= 1 ? META : Math.round(META * sai3(pc)));
+
+  const pp = prog(t, T.pulso);
+  const s = 1 + 0.035 * Math.sin(Math.PI * pp);   // 1 → 1,035 → 1
+  escalaNum.setAttribute('transform',
+    `translate(${centroNum.x} ${centroNum.y}) scale(${s.toFixed(4)}) translate(${-centroNum.x} ${-centroNum.y})`);
+};
+window.FPS = FPS;
+window.DURACAO = DURACAO;
+quadro(0);
+
+/* ---------------------------------------- prévia no navegador (loop) --- */
+if (!/[?&]render/.test(location.search)) {
+  document.body.classList.add('previa');
+  let pausado = false, t0 = performance.now(), tPausa = 0;
+  addEventListener('keydown', (e) => {
+    if (e.code !== 'Space') return;
+    pausado = !pausado;
+    if (pausado) tPausa = (performance.now() - t0) / 1000;
+    else t0 = performance.now() - tPausa * 1000;
+  });
+  const passo = (agora) => {
+    if (!pausado) quadro(((agora - t0) / 1000) % DURACAO);
+    requestAnimationFrame(passo);
+  };
+  requestAnimationFrame(passo);
+}
+</script>
+</body>
+</html>
