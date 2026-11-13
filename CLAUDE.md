@@ -41,7 +41,12 @@ js/previews.js   renderização fiel de Instagram / Facebook / LinkedIn / Ads
 js/ui.js         peças reutilizáveis (cartão, modal, toast, segmentado)
 js/views.js      painel, postagens, calendário, aprovação, compositor, ajustes
 js/app.js        roteador por hash, navegação, atalhos, paleta de comandos
+pecas/           peças de conteúdo prontas para subir no app (lâminas + legenda)
 ```
+
+`pecas/` não faz parte do aplicativo: cada pasta é uma peça produzida para a
+Bracerum Park, na identidade **do parque** (não na do APROVA), com a fonte
+editável em `fonte/` e um `LEGENDA.md` que diz de onde saiu cada número.
 
 ## Arquitetura — o que não quebrar
 

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Carrossel — os ambientes do Bracerum Park</title>
+<!--
+  Fonte das 8 lâminas (1080 × 1080) do carrossel de Instagram.
+  Para regerar os JPG: node renderizar.js  (ver ../LEGENDA.md)
+
+  Identidade: a do Bracerum Park (site e folders), não a do APROVA —
+  preto/papel/areia/marrom, Helvetica + Noto Serif condensada com itálico
+  como ênfase, cantos quadrados, zero vermelho.
+-->
+<style>
+  @font-face { font-family: "Noto Serif"; font-style: normal; font-weight: 100 900; font-stretch: 62.5% 100%;
+    src: url(fontes/noto-serif-latin-standard-normal.woff2) format("woff2-variations"); }
+  @font-face { font-family: "Noto Serif"; font-style: italic; font-weight: 100 900; font-stretch: 62.5% 100%;
+    src: url(fontes/noto-serif-latin-standard-italic.woff2) format("woff2-variations"); }
+
+  :root {
+    --ink: #0e0d0b;
+    --paper: #f7f3ea;
+    --sand: #cbb88f;
+    --brown: #473315;
+    --serif: "Noto Serif", Georgia, serif;
+    --sans: Helvetica, Arial, "Liberation Sans", sans-serif;
+    --pad: 76px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #444; display: grid; gap: 40px; padding: 40px; justify-content: center;
+    font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+
+  .lamina { position: relative; width: 1080px; height: 1080px; overflow: hidden;
+    background: var(--ink); color: var(--paper); }
+  /* A foto ocupa o topo (720 px) e se dissolve no preto. Assim o render
+     aparece quase inteiro (~84% da largura, sem ampliar a imagem) e o texto
+     mora sempre sobre fundo escuro. */
+  .foto { position: absolute; top: 0; left: 0; width: 100%; height: 720px; object-fit: cover;
+    -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+            mask-image: linear-gradient(to bottom, #000 60%, transparent 100%); }
+  .veu { position: absolute; inset: 0;
+    background: linear-gradient(to bottom,
+      rgba(14,13,11,.6) 0%, rgba(14,13,11,0) 15%, rgba(14,13,11,0) 30%,
+      rgba(14,13,11,.7) 41%, rgba(14,13,11,.9) 50%, rgba(14,13,11,.94) 100%); }
+
+  .topo { position: absolute; top: 64px; left: var(--pad); right: var(--pad);
+    display: flex; align-items: center; justify-content: space-between; }
+  .logo { height: 40px; width: auto; display: block; }
+  .contador { font: 700 15px/1 var(--sans); letter-spacing: .22em; color: var(--paper); opacity: .9; }
+
+  .corpo { position: absolute; left: var(--pad); right: var(--pad); bottom: 122px; }
+  .eyebrow { display: flex; align-items: center; gap: 14px;
+    font: 700 18px/1 var(--sans); letter-spacing: .24em; text-transform: uppercase; color: var(--sand); }
+  .eyebrow::before { content: ""; width: 40px; height: 1px; background: currentColor; }
+  .titulo { margin-top: 24px; font-family: var(--serif); font-weight: 300;
+    font-stretch: 62.5%; font-variation-settings: "wdth" 62.5;
+    font-size: 98px; line-height: .94; letter-spacing: -.012em; }
+  .titulo em { font-style: italic; }
+  .desc { margin-top: 24px; max-width: 900px; font: 400 28px/1.38 var(--sans); color: rgba(247,243,234,.84); }
+
+  .fatos { margin-top: 36px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fatos > div { border-top: 1px solid rgba(203,184,143,.7); padding: 20px 24px 0 0; }
+  .fatos dt { font-family: var(--serif); font-weight: 300; font-stretch: 75%; font-variation-settings: "wdth" 75;
+    font-size: 56px; line-height: 1; letter-spacing: -.01em; white-space: nowrap; }
+  .fatos dd { margin-top: 10px; font: 400 22px/1.3 var(--sans); white-space: nowrap; color: rgba(247,243,234,.74); }
+
+  .pe { position: absolute; left: var(--pad); right: var(--pad); bottom: 54px;
+    display: flex; align-items: center; justify-content: space-between; gap: 40px; }
+  .progresso { display: grid; grid-template-columns: repeat(8, 30px); gap: 6px; }
+  .progresso i { height: 3px; background: rgba(247,243,234,.22); }
+  .progresso i.vista { background: rgba(247,243,234,.55); }
+  .progresso i.agora { background: var(--sand); }
+  .nota { font: 400 15px/1 var(--sans); letter-spacing: .04em; color: rgba(247,243,234,.6); }
+  .deslize { font: 700 17px/1 var(--sans); letter-spacing: .22em; text-transform: uppercase; color: var(--paper); }
+  .deslize b { font-weight: 400; letter-spacing: 0; margin-left: 10px; font-size: 26px; vertical-align: -3px; }
+
+  /* ---- capa ----
+     Margem maior: a grade do perfil do Instagram recorta 3:4 do centro
+     (some ~135 px de cada lado de uma imagem quadrada). */
+  .capa { --pad: 150px; }
+  .capa .titulo { font-size: 124px; }
+  .indice { margin-top: 36px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 40px; border-top: 1px solid rgba(203,184,143,.7); }
+  .indice li { list-style: none; display: flex; align-items: baseline; gap: 16px;
+    padding: 15px 0; border-bottom: 1px solid rgba(247,243,234,.16); font: 400 24px/1.2 var(--sans); }
+  .indice li span { font-family: var(--serif); font-style: italic; font-weight: 300; font-size: 25px; color: var(--sand); min-width: 32px; }
+
+  /* ---- fechamento, em papel ---- */
+  .fecho { background: var(--paper); color: var(--ink); }
+  .fecho .contador { color: var(--ink); }
+  .fecho .eyebrow { color: var(--brown); }
+  .fecho .corpo { top: 160px; bottom: auto; }
+  .fecho .titulo { font-size: 108px; }
+  .mosaico { margin-top: 44px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .mosaico figure { position: relative; height: 186px; overflow: hidden; background: var(--ink); }
+  .mosaico img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .mosaico figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 30px 16px 13px;
+    background: linear-gradient(to bottom, rgba(14,13,11,0), rgba(14,13,11,.86));
+    color: var(--paper); font: 700 16px/1.2 var(--sans); letter-spacing: .12em; text-transform: uppercase; }
+  .mosaico figcaption span { font-family: var(--serif); font-style: italic; font-weight: 300; letter-spacing: 0;
+    text-transform: none; font-size: 19px; color: var(--sand); margin-right: 8px; }
+  .chamada { margin-top: 38px; display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+  .chamada p { font: 400 26px/1.38 var(--sans); color: rgba(14,13,11,.78); max-width: 500px; }
+  .site { text-align: right; }
+  .site b { display: block; font-family: var(--serif); font-weight: 400; font-stretch: 75%; font-variation-settings: "wdth" 75;
+    font-size: 54px; line-height: 1; letter-spacing: -.01em; color: var(--ink); }
+  .site small { display: block; margin-top: 12px; font: 700 16px/1 var(--sans); letter-spacing: .22em; text-transform: uppercase; color: var(--brown); }
+  .fecho .progresso i { background: rgba(14,13,11,.16); }
+  .fecho .progresso i.vista { background: rgba(14,13,11,.45); }
+  .fecho .progresso i.agora { background: var(--brown); }
+  .fecho .nota { color: rgba(14,13,11,.6); }
+</style>
+</head>
+<body>
+<script>
+/* ---------------------------------------------------------------------------
+   Conteúdo. Números conferidos no repositório do site (mate337/BracerumPark):
+   docs/build_lps.py (LPs dos folders), 3dmasterplan/app.js (Masterplan V14)
+   e docs/masterplan-v12.md. O que ainda pede confirmação está em ../LEGENDA.md.
+   --------------------------------------------------------------------------- */
+const TOTAL = 8;
+const AMBIENTES = [
+  { arq: '02-residence-casas', foto: 'resort-casa-modelo.jpg', pos: '62% 50%',
+    rotulo: 'Morar', titulo: 'Bracerum Residence<br><em>Casas</em>', curto: 'Residence Casas',
+    desc: 'Condomínio fechado de casas: ruas tranquilas, verde por toda parte e portaria cuidando de quem entra e sai.',
+    fatos: [['600 m²', 'lote mínimo'], ['31', 'lotes residenciais'], ['3 suítes', 'na casa modelo']] },
+  { arq: '03-residence-apartamentos', foto: 'residence-torre.jpg', pos: '36% 50%',
+    rotulo: 'Morar', titulo: 'Bracerum Residence<br><em>Apartamentos</em>', curto: 'Residence Aptos',
+    desc: 'Apartamentos a poucos passos da operação, com praia artificial entre as torres e o Bracerum Club por perto.',
+    fatos: [['67', 'torres'], ['1.452', 'apartamentos'], ['1 a 3', 'quartos + coberturas']] },
+  { arq: '04-outlet-premium', foto: 'outlet-boulevard.jpg', pos: '52% 50%',
+    rotulo: 'Comprar', titulo: 'Bracerum<br><em>Outlet Premium</em>', curto: 'Outlet Premium',
+    desc: 'Lojas, praça de alimentação e serviços de frente para a PY-19, com o público que o parque traz todos os dias.',
+    fatos: [['57', 'lojas na 1ª fase'], ['17.870 m²', 'vendáveis na 1ª fase'], ['PY-19', 'vitrine para a rodovia']] },
+  { arq: '05-lotes-industriais', foto: 'park-galpao-avenida.jpg', pos: '30% 50%',
+    rotulo: 'Produzir', titulo: 'Loteamentos<br><em>industriais</em>', curto: 'Lotes industriais',
+    desc: 'Lotes à venda no centro do Mercosul, às margens da PY-19, com recinto alfandegado dentro do parque.',
+    fatos: [['1.250 m²', 'lote mínimo (25 × 50 m)'], ['1%', 'tributo único (Maquila)'], ['23 km', 'do Terport Villeta']] },
+  { arq: '06-hangar', foto: 'park-hangar-jato.jpg', pos: '38% 50%',
+    rotulo: 'Voar', titulo: 'Hangar<br><em>e pista de pouso</em>', curto: 'Hangar',
+    desc: 'Carga e executivos chegam de avião direto ao parque: hangares com lounge e abastecimento, de frente para o pátio.',
+    fatos: [['7', 'hangares'], ['1.460 m', 'de pista de pouso'], ['Heliponto', 'no pátio dos hangares']] },
+  { arq: '07-convencoes-hotel', foto: 'hotel-cupula-dia.jpg', pos: '40% 50%',
+    rotulo: 'Receber', titulo: 'Centro de Convenções<br><em>e Hotel</em>', curto: 'Convenções e Hotel',
+    desc: 'Feiras e congressos sob a cobertura de vidro, colados ao Bracerum Hotel — para quem vem fechar negócio.',
+    fatos: [['13.500 m²', 'de centro de convenções'], ['1.200', 'lugares no anfiteatro'], ['384', 'studios no hotel']] },
+];
+
+const pad = (n) => String(n).padStart(2, '0');
+const progresso = (n) => `<div class="progresso">${Array.from({ length: TOTAL }, (_, i) =>
+  `<i class="${i + 1 === n ? 'agora' : i + 1 < n ? 'vista' : ''}"></i>`).join('')}</div>`;
+const topo = (n, logo = 'cream') => `<header class="topo">
+  <img class="logo" src="logo-horizontal-${logo}.svg" alt="Bracerum Park">
+  <span class="contador">${pad(n)} / ${pad(TOTAL)}</span></header>`;
+
+let html = '';
+
+/* 01 — capa */
+html += `<section class="lamina capa" data-arq="01-capa">
+  <img class="foto" src="fotos/park-aereo-rio.jpg" style="object-position:50% 50%" alt="">
+  <div class="veu"></div>
+  ${topo(1)}
+  <div class="corpo">
+    <p class="eyebrow">Bracerum Park · Villeta, Paraguai</p>
+    <h1 class="titulo">Seis ambientes.<br><em>Uma cidade só.</em></h1>
+    <ol class="indice">${AMBIENTES.map((a, i) => `<li><span>${pad(i + 1)}</span>${a.curto}</li>`).join('')}</ol>
+  </div>
+  <footer class="pe">${progresso(1)}<span class="deslize">Deslize<b>→</b></span></footer>
+</section>`;
+
+/* 02–07 — um ambiente por lâmina */
+AMBIENTES.forEach((a, i) => {
+  const n = i + 2;
+  html += `<section class="lamina" data-arq="${a.arq}">
+  <img class="foto" src="fotos/${a.foto}" style="object-position:${a.pos}" alt="">
+  <div class="veu"></div>
+  ${topo(n)}
+  <div class="corpo">
+    <p class="eyebrow">${pad(i + 1)} · ${a.rotulo}</p>
+    <h2 class="titulo">${a.titulo}</h2>
+    <p class="desc">${a.desc}</p>
+    <dl class="fatos">${a.fatos.map(([v, r]) => `<div><dt>${v}</dt><dd>${r}</dd></div>`).join('')}</dl>
+  </div>
+  <footer class="pe">${progresso(n)}<span class="nota">Imagem ilustrativa</span></footer>
+</section>`;
+});
+
+/* 08 — fechamento */
+html += `<section class="lamina fecho" data-arq="08-fechamento">
+  ${topo(8, 'black')}
+  <div class="corpo">
+    <p class="eyebrow">Morar · Comprar · Produzir · Voar · Receber</p>
+    <h2 class="titulo">Tudo isso num<br><em>endereço só.</em></h2>
+    <div class="mosaico">${AMBIENTES.map((a, i) => `<figure>
+      <img src="fotos/${a.foto}" style="object-position:${a.pos}" alt="">
+      <figcaption><span>${pad(i + 1)}</span>${a.curto}</figcaption></figure>`).join('')}</div>
+    <div class="chamada">
+      <p>Explore o masterplan 3D lote por lote e fale com a nossa equipe.</p>
+      <div class="site"><b>bracerumpark.com</b><small>Link na bio</small></div>
+    </div>
+  </div>
+  <footer class="pe">${progresso(8)}<span class="nota">Villeta · Paraguai · PY-19 · Imagens ilustrativas</span></footer>
+</section>`;
+
+document.body.insertAdjacentHTML('beforeend', html);
+</script>
+</body>
+</html>
