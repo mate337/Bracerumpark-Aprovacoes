@@ -4,9 +4,14 @@
 <meta charset="utf-8">
 <title>Feed — Paraguai, EXPO e Stand A 175</title>
 <!--
-  Vídeo de feed (1080 × 1350, 4:5) que junta os três stories da EXPO
+  Vídeo vertical (1080 × 1920, 9:16) que junta os três stories da EXPO
   Paraguai-Brasil (posts.ai) e acrescenta os números do Paraguai que o site do
   parque publica em /tributacao.
+
+  A arte é desenhada em 4:5 (1080 × 1350) e fica no meio da tela (.miolo, a
+  285 px do topo): no feed, o Instagram recorta o centro em 4:5 e mostra a
+  arte inteira; no Reels, o resto da tela é branco. Na cena 4 a foto da
+  estrada é o fundo, então ela cobre a tela toda.
 
   Quatro cenas:
     1. O Paraguai virou potência (render do saguão)
@@ -28,10 +33,11 @@
   body.previa { display: grid; place-items: center; min-height: 100vh; }
   body.previa #palco { transform: scale(var(--k, .6)); transform-origin: center; }
 
-  #palco { position: relative; width: 1080px; height: 1350px; overflow: hidden; background: var(--papel);
+  #palco { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: var(--papel);
     font-family: "Helv", Helvetica, Arial, sans-serif; color: var(--tinta);
     -webkit-font-smoothing: antialiased; font-kerning: normal; }
   .cena { position: absolute; inset: 0; }
+  .miolo { position: absolute; left: 0; top: 285px; width: 1080px; height: 1350px; }
   .abs { position: absolute; }
 
   /* linha que sobe de dentro de uma janela */
@@ -62,7 +68,7 @@
 
   /* cena 4 */
   .fundo4 { position: absolute; inset: 0; overflow: hidden; background: #111; }
-  .fundo4 img { position: absolute; height: 100%; width: auto; left: -36%; top: 0; transform-origin: 62% 55%; }
+  .fundo4 img { position: absolute; height: 100%; width: auto; left: -72%; top: 0; transform-origin: 62% 55%; }
   .fundo4::after { content: ""; position: absolute; inset: 0;
     background: linear-gradient(to bottom, rgba(12,12,12,.55), rgba(12,12,12,.38) 40%, rgba(12,12,12,.5)); }
   .bloco { position: absolute; left: 212px; right: 0; top: 742px; height: 356px; background: var(--ouro); overflow: hidden; }
@@ -134,20 +140,22 @@ const visivel = (cena, t, ini, fim) => { cena.style.visibility = t >= ini - 0.01
 
 /* ================================================================ CENA 1 */
 const c1 = el('div', 'cena');
+const m1 = el('div', 'miolo', c1);
 const c1l = [
-  linha(c1, 'O Paraguai se tornou uma gigante', { x: 96, y: 136 }),
-  linha(c1, 'potência para negócios e indústria', { x: 96, y: 194 }),
+  linha(m1, 'O Paraguai se tornou uma gigante', { x: 96, y: 136 }),
+  linha(m1, 'potência para negócios e indústria', { x: 96, y: 194 }),
 ];
-const foto1 = el('div', 'abs foto1', c1, '<img src="imagens/saguao.jpg" alt="">');
+const foto1 = el('div', 'abs foto1', m1, '<img src="imagens/saguao.jpg" alt="">');
 const foto1img = foto1.querySelector('img');
 
 /* ================================================================ CENA 2 */
 const c2 = el('div', 'cena');
-const c2t = linha(c2, 'Por que o Paraguai?', { x: 96, y: 128 });
-const c2s = linha(c2, 'Os números explicam.', { x: 96, y: 186, cls: 'texto ouro' });
+const m2 = el('div', 'miolo', c2);
+const c2t = linha(m2, 'Por que o Paraguai?', { x: 96, y: 128 });
+const c2s = linha(m2, 'Os números explicam.', { x: 96, y: 186, cls: 'texto ouro' });
 const POS = [[96, 300], [564, 300], [96, 680], [564, 680]];
 const fatos = FATOS.map((f, i) => {
-  const box = el('div', 'fato', c2);
+  const box = el('div', 'fato', m2);
   box.style.left = POS[i][0] + 'px'; box.style.top = POS[i][1] + 'px';
   const regua = el('div', 'regua', box);
   const num = el('div', 'num', box);
@@ -155,7 +163,7 @@ const fatos = FATOS.map((f, i) => {
   return { f, box, regua, num, rot };
 });
 const peq = FATOS_PEQ.map((f, i) => {
-  const box = el('div', 'fato peq', c2);
+  const box = el('div', 'fato peq', m2);
   box.style.left = POS[i][0] + 'px'; box.style.top = '1062px';
   const regua = el('div', 'regua', box);
   const num = el('div', 'num', box, f.txt);
@@ -165,35 +173,37 @@ const peq = FATOS_PEQ.map((f, i) => {
 
 /* ================================================================ CENA 3 */
 const c3 = el('div', 'cena');
+const m3 = el('div', 'miolo', c3);
 const c3l = [
-  linha(c3, 'E a presença do Bracerum Park na', { x: 984, y: 116, alinhar: 'dir', cls: 'texto ouro', tam: 46 }),
-  linha(c3, 'EXPO Paraguai-Brasil só comprova isso', { x: 984, y: 170, alinhar: 'dir', cls: 'texto ouro', tam: 46 }),
+  linha(m3, 'E a presença do Bracerum Park na', { x: 984, y: 116, alinhar: 'dir', cls: 'texto ouro', tam: 46 }),
+  linha(m3, 'EXPO Paraguai-Brasil só comprova isso', { x: 984, y: 170, alinhar: 'dir', cls: 'texto ouro', tam: 46 }),
 ];
-const moldura = el('div', 'moldura', c3, '<img alt="">');
+const moldura = el('div', 'moldura', m3, '<img alt="">');
 const videoImg = moldura.querySelector('img');
-const c3a = linha(c3, 'Já são mais de', { x: 590, y: 480, tam: 40 });
-const c3n = linha(c3, '0', { x: 984, y: 532, alinhar: 'dir', cls: 'num', tam: 132 });
+const c3a = linha(m3, 'Já são mais de', { x: 590, y: 480, tam: 40 });
+const c3n = linha(m3, '0', { x: 984, y: 532, alinhar: 'dir', cls: 'num', tam: 132 });
 const c3b = [
-  linha(c3, 'participantes', { x: 984, y: 676, alinhar: 'dir', tam: 40 }),
-  linha(c3, 'ativos no evento', { x: 984, y: 724, alinhar: 'dir', tam: 40 }),
+  linha(m3, 'participantes', { x: 984, y: 676, alinhar: 'dir', tam: 40 }),
+  linha(m3, 'ativos no evento', { x: 984, y: 724, alinhar: 'dir', tam: 40 }),
 ];
 
 /* ================================================================ CENA 4 */
 const c4 = el('div', 'cena');
 const fundo4 = el('div', 'fundo4', c4, '<img src="imagens/estrada.jpg" alt="">');
 const fundo4img = fundo4.querySelector('img');
+const m4 = el('div', 'miolo', c4);
 const c4l = [
-  linha(c4, 'Hoje é o último dia, e ainda tem', { x: 984, y: 214, alinhar: 'dir', cls: 'texto branco' }),
-  linha(c4, 'muito negócio acontecendo', { x: 984, y: 272, alinhar: 'dir', cls: 'texto branco' }),
-  linha(c4, 'Venha conhecer', { x: 120, y: 560, cls: 'texto branco' }),
-  linha(c4, 'o Bracerum Park', { x: 120, y: 618, cls: 'texto branco' }),
+  linha(m4, 'Hoje é o último dia, e ainda tem', { x: 984, y: 214, alinhar: 'dir', cls: 'texto branco' }),
+  linha(m4, 'muito negócio acontecendo', { x: 984, y: 272, alinhar: 'dir', cls: 'texto branco' }),
+  linha(m4, 'Venha conhecer', { x: 120, y: 560, cls: 'texto branco' }),
+  linha(m4, 'o Bracerum Park', { x: 120, y: 618, cls: 'texto branco' }),
 ];
-const bloco = el('div', 'bloco', c4);
+const bloco = el('div', 'bloco', m4);
 const stand = linha(bloco, 'STAND', { x: 984 - 212, y: 44, alinhar: 'dir', cls: '', tam: 82 });
 const numero = linha(bloco, 'A 175', { x: 984 - 212, y: 118, alinhar: 'dir', cls: '', tam: 218 });
 for (const l of [stand, numero]) { l.w.style.right = '96px'; l.w.style.left = 'auto'; }
-const logo = el('img', 'logo', c4); logo.src = 'imagens/logo-branco.svg'; logo.alt = 'Bracerum Park';
-const evento = el('div', 'evento', c4, 'EXPO Paraguai-Brasil');
+const logo = el('img', 'logo', m4); logo.src = 'imagens/logo-branco.svg'; logo.alt = 'Bracerum Park';
+const evento = el('div', 'evento', m4, 'EXPO Paraguai-Brasil');
 
 /* ============================================================ UM QUADRO */
 window.quadro = function (t) {
@@ -285,7 +295,7 @@ window.FPS = FPS; window.DURACAO = DURACAO;
 const qs = new URLSearchParams(location.search);
 if (!qs.has('render')) {
   document.body.classList.add('previa');
-  document.documentElement.style.setProperty('--k', Math.min(innerWidth / 1080, innerHeight / 1350) * .96);
+  document.documentElement.style.setProperty('--k', Math.min(innerWidth / 1080, innerHeight / 1920) * .96);
   if (qs.get('video')) videoImg.src = qs.get('video');   // um quadro qualquer do vídeo, só para ver a moldura
   let t0 = performance.now() - (Number(qs.get('t')) || 0) * 1000, pausa = null;
   addEventListener('keydown', (e) => {

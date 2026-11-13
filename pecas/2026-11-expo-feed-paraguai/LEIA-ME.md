@@ -1,7 +1,12 @@
 # Feed — Paraguai, EXPO Paraguai-Brasil e Stand A 175
 
 Vídeo de feed que junta os três stories do `posts.ai` e acrescenta os números
-do Paraguai. **1080 × 1350 (4:5) · 30 fps · 30 s · H.264 + som.**
+do Paraguai. **1080 × 1920 (9:16) · 30 fps · 30 s · H.264 + som.**
+
+A arte é desenhada em 4:5 (1080 × 1350) e fica centralizada na tela vertical:
+no feed, o Instagram recorta o centro em 4:5 e mostra a arte inteira; no Reels,
+o resto da tela é branco. Na cena 4 o fundo é a foto da estrada, que se
+estende até as bordas.
 
 | Cena | Tempo | Conteúdo |
 |---|---|---|
@@ -21,7 +26,7 @@ e o dourado **#b3924f**, cantos retos.
 
 - `feed-expo-paraguai.mp4`: o post. **Fora do git:** tem a filmagem do estande
   e o repositório é público.
-- `capa.jpg`: o quadro final (Stand A 175), para escolher como capa.
+- `capa.jpg`: o quadro final (Stand A 175), 1080 × 1920, para escolher como capa.
 - `fonte/`: `animacao.html` (abre no navegador e toca em loop; espaço pausa,
   ←/→ andam 1 s, `?t=14` começa no segundo 14) e `renderizar.js`.
 

@@ -1,4 +1,4 @@
-/* Gera o vídeo de feed (1080 × 1350, 30 fps, 30 s).
+/* Gera o vídeo vertical (1080 × 1920, 30 fps, 30 s).
    Uso: node renderizar.js caminho/do/video-do-estande.mp4
    Precisa do Playwright (Chromium) e do ffmpeg com libx264.
 
@@ -22,7 +22,7 @@ const ff = (args) => execFileSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 
   fs.mkdirSync(quadros); fs.mkdirSync(vq);
 
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
   await page.goto('file://' + path.join(__dirname, 'animacao.html') + '?render');
   await page.evaluate(() => document.fonts.ready);
   const { FPS, DURACAO, C3 } = await page.evaluate(() => ({ FPS: window.FPS, DURACAO: window.DURACAO, C3: window.C3 }));
