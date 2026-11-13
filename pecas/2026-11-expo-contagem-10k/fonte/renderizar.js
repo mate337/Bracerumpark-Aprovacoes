@@ -70,7 +70,9 @@ const ff = (args) => execFileSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 
   const som = fonteVideo ? ['-i', fonteVideo, '-map', '0:v', '-map', '1:a?', '-shortest'] : [];
   const nome = fonteVideo ? 'story-10k-video' : 'contagem-10k';
 
-  ff([...seq, ...som, '-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', '-alpha_bits', '16',
+  /* com vídeo, qscale 11 e alfa de 8 bits: ~190 MB em vez de ~570 MB, sem diferença visível */
+  ff([...seq, ...som, '-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le',
+      ...(fonteVideo ? ['-qscale:v', '11', '-alpha_bits', '8'] : ['-alpha_bits', '16']),
       '-vendor', 'apl0', ...(fonteVideo ? ['-c:a', 'aac', '-b:a', '192k'] : []),
       path.join(destino, `${nome}-transparente.mov`)]);
   ff([...seq, ...som, '-c:v', 'libvpx-vp9', '-pix_fmt', 'yuva420p', '-b:v', '0', '-crf', fonteVideo ? '24' : '18',

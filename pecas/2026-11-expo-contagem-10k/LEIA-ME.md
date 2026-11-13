@@ -44,7 +44,7 @@ O vídeo gravado no estande (WhatsApp, 12/11, 24 s, retrato 480 × 848) entra
 | Arquivo | Para quê |
 |---|---|
 | `story-10k-video.mp4` | **Pronto para o story**: fundo branco, H.264 + som. |
-| `story-10k-video-transparente.mov` | ProRes 4444 com alfa + som, para editar. |
+| `story-10k-video-transparente.mov` | ProRes 4444 com alfa + som, para editar (~190 MB). |
 | `story-10k-video-transparente.webm` | VP9 com alfa + som. |
 
 **Esses três ficam fora do git:** o repositório é público e a filmagem mostra
