@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Feed — Paraguai, EXPO e Stand A 175</title>
+<!--
+  Vídeo de feed (1080 × 1350, 4:5) que junta os três stories da EXPO
+  Paraguai-Brasil (posts.ai) e acrescenta os números do Paraguai que o site do
+  parque publica em /tributacao.
+
+  Quatro cenas:
+    1. O Paraguai virou potência (render do saguão)
+    2. Por que o Paraguai — os números (1% · 10% · −60% · 0% · Baa3 · 100%)
+    3. A presença na EXPO — vídeo do estande + contagem até 10.000
+    4. Último dia — Stand A 175
+
+  Aberto no navegador, toca em loop (espaço pausa, ←/→ andam 1 s; ?t=14 começa
+  no segundo 14). O renderizar.js chama quadro(t) e grava cada quadro.
+  Identidade dos stories: Helvetica (aqui a Nimbus Sans, clone métrico),
+  preto, branco e o dourado #b3924f; cantos retos.
+-->
+<style>
+  @font-face { font-family: "Helv"; font-weight: 400; src: url(fontes/NimbusSans-Regular.otf); }
+  @font-face { font-family: "Helv"; font-weight: 700; src: url(fontes/NimbusSans-Bold.otf); }
+  :root { --ouro: #b3924f; --tinta: #090909; --papel: #fff; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #2a2a2a; }
+  body.previa { display: grid; place-items: center; min-height: 100vh; }
+  body.previa #palco { transform: scale(var(--k, .6)); transform-origin: center; }
+
+  #palco { position: relative; width: 1080px; height: 1350px; overflow: hidden; background: var(--papel);
+    font-family: "Helv", Helvetica, Arial, sans-serif; color: var(--tinta);
+    -webkit-font-smoothing: antialiased; font-kerning: normal; }
+  .cena { position: absolute; inset: 0; }
+  .abs { position: absolute; }
+
+  /* linha que sobe de dentro de uma janela */
+  .ln { position: absolute; overflow: hidden; white-space: nowrap; padding: .08em 0 .18em; }
+  .ln > span { display: block; will-change: transform; }
+
+  .texto { font-size: 50px; line-height: 1.16; }
+  .ouro { color: var(--ouro); }
+  .branco { color: #fff; }
+  .num { font-weight: 700; color: var(--ouro); line-height: 1; letter-spacing: -.005em; font-variant-numeric: tabular-nums; }
+
+  /* cena 1 */
+  .foto1 { left: 96px; top: 330px; width: 888px; height: 860px; overflow: hidden; }
+  .foto1 img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; transform-origin: 50% 60%; }
+
+  /* cena 2 */
+  .fato { position: absolute; width: 420px; }
+  .fato .regua { height: 2px; background: var(--ouro); transform-origin: 0 50%; }
+  .fato .num { position: absolute; left: -4px; top: 26px; font-size: 150px; white-space: nowrap; }
+  .fato .rot { position: absolute; left: 0; top: 196px; width: 420px; font-size: 30px; line-height: 1.24; }
+  .fato.peq .num { font-size: 60px; top: 22px; left: -2px; }
+  .fato.peq .rot { top: 96px; font-size: 26px; }
+
+  /* cena 3 */
+  .moldura { position: absolute; left: 96px; top: 290px; width: 440px; height: 778px;
+    outline: 6px solid var(--ouro); box-shadow: 0 18px 44px rgba(0,0,0,.2); background: #111; }
+  .moldura img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* cena 4 */
+  .fundo4 { position: absolute; inset: 0; overflow: hidden; background: #111; }
+  .fundo4 img { position: absolute; height: 100%; width: auto; left: -36%; top: 0; transform-origin: 62% 55%; }
+  .fundo4::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, rgba(12,12,12,.55), rgba(12,12,12,.38) 40%, rgba(12,12,12,.5)); }
+  .bloco { position: absolute; left: 212px; right: 0; top: 742px; height: 356px; background: var(--ouro); overflow: hidden; }
+  .bloco .ln { right: 96px; text-align: right; color: #fff; font-weight: 700; line-height: 1; }
+  .logo { position: absolute; left: 96px; top: 1214px; height: 52px; }
+  .evento { position: absolute; right: 96px; top: 1226px; font-size: 26px; color: #fff; letter-spacing: .01em; }
+</style>
+</head>
+<body>
+<div id="palco"></div>
+<script>
+'use strict';
+const FPS = 30;
+const DURACAO = 30;
+
+/* ------------------------------------------------------------ roteiro --- */
+/* Tempos em segundos. Cada cena entra, segura para leitura e sai. */
+const C1 = { ini: 0.0,  sai: 4.9 };
+const C2 = { ini: 5.35, sai: 13.0 };
+const C3 = { ini: 13.45, video: 13.85, sai: 21.9 };
+const C4 = { ini: 21.9 };
+
+/* Números do Paraguai: página /tributacao do site do parque (tese fiscal,
+   custo de operar e mitos e fatos). Ver ../LEIA-ME.md. */
+const FATOS = [
+  { de: 35, para: 1,  fmt: (n) => `${n}%`,  rot: 'tributo único na Maquila — contra 25% a 35% nos países vizinhos' },
+  { de: 0,  para: 10, fmt: (n) => `${n}%`,  rot: 'de imposto de renda, de IVA e de imposto pessoal: o regime 10·10·10' },
+  { de: 0,  para: 60, fmt: (n) => `−${n}%`, rot: 'na tarifa de energia industrial, com matriz 100% hidrelétrica' },
+  { de: 35, para: 0,  fmt: (n) => `${n}%`,  rot: 'de tarifa para vender a 270 milhões de consumidores no Mercosul' },
+];
+const FATOS_PEQ = [
+  { txt: 'Baa3', rot: 'grau de investimento pela Moody’s' },
+  { txt: '100%', rot: 'de capital estrangeiro permitido' },
+];
+
+/* -------------------------------------------------------------- utilidades --- */
+const sai3 = (x) => 1 - Math.pow(1 - x, 3);
+const entra2 = (x) => x * x;
+const vaiVem = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const p = (t, ini, dur) => Math.min(1, Math.max(0, (t - ini) / dur));
+const fmtMil = (n) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+const palco = document.getElementById('palco');
+function el(tag, cls, pai, html) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html != null) e.innerHTML = html;
+  (pai || palco).append(e);
+  return e;
+}
+/* uma linha de texto com janela; alinhar: 'esq' (x = borda esquerda) ou 'dir' (x = borda direita) */
+function linha(pai, txt, { x, y, cls = 'texto', alinhar = 'esq', tam }) {
+  const w = el('div', 'ln ' + cls, pai);
+  w.style.top = y + 'px';
+  if (alinhar === 'dir') { w.style.right = (1080 - x) + 'px'; w.style.textAlign = 'right'; } else w.style.left = x + 'px';
+  if (tam) w.style.fontSize = tam + 'px';
+  const s = el('span', '', w, txt);
+  return { w, s };
+}
+/* sobe para dentro da janela (entrada) e, na saída, continua subindo e some */
+function anima(l, t, ini, saida = Infinity, dur = 0.75) {
+  const e = sai3(p(t, ini, dur));
+  const so = entra2(p(t, saida, 0.42));
+  const dy = (1 - e) * 110 - so * 70;
+  l.s.style.transform = `translateY(${dy.toFixed(2)}%)`;
+  l.w.style.opacity = (Math.min(1, p(t, ini, dur * .55)) * (1 - so)).toFixed(3);
+}
+const visivel = (cena, t, ini, fim) => { cena.style.visibility = t >= ini - 0.01 && t < fim ? 'visible' : 'hidden'; };
+
+/* ================================================================ CENA 1 */
+const c1 = el('div', 'cena');
+const c1l = [
+  linha(c1, 'O Paraguai se tornou uma gigante', { x: 96, y: 136 }),
+  linha(c1, 'potência para negócios e indústria', { x: 96, y: 194 }),
+];
+const foto1 = el('div', 'abs foto1', c1, '<img src="imagens/saguao.jpg" alt="">');
+const foto1img = foto1.querySelector('img');
+
+/* ================================================================ CENA 2 */
+const c2 = el('div', 'cena');
+const c2t = linha(c2, 'Por que o Paraguai?', { x: 96, y: 128 });
+const c2s = linha(c2, 'Os números explicam.', { x: 96, y: 186, cls: 'texto ouro' });
+const POS = [[96, 300], [564, 300], [96, 680], [564, 680]];
+const fatos = FATOS.map((f, i) => {
+  const box = el('div', 'fato', c2);
+  box.style.left = POS[i][0] + 'px'; box.style.top = POS[i][1] + 'px';
+  const regua = el('div', 'regua', box);
+  const num = el('div', 'num', box);
+  const rot = el('div', 'rot', box, f.rot);
+  return { f, box, regua, num, rot };
+});
+const peq = FATOS_PEQ.map((f, i) => {
+  const box = el('div', 'fato peq', c2);
+  box.style.left = POS[i][0] + 'px'; box.style.top = '1062px';
+  const regua = el('div', 'regua', box);
+  const num = el('div', 'num', box, f.txt);
+  const rot = el('div', 'rot', box, f.rot);
+  return { box, regua, num, rot };
+});
+
+/* ================================================================ CENA 3 */
+const c3 = el('div', 'cena');
+const c3l = [
+  linha(c3, 'E a presença do Bracerum Park na', { x: 984, y: 116, alinhar: 'dir', cls: 'texto ouro', tam: 46 }),
+  linha(c3, 'EXPO Paraguai-Brasil só comprova isso', { x: 984, y: 170, alinhar: 'dir', cls: 'texto ouro', tam: 46 }),
+];
+const moldura = el('div', 'moldura', c3, '<img alt="">');
+const videoImg = moldura.querySelector('img');
+const c3a = linha(c3, 'Já são mais de', { x: 590, y: 480, tam: 40 });
+const c3n = linha(c3, '0', { x: 984, y: 532, alinhar: 'dir', cls: 'num', tam: 132 });
+const c3b = [
+  linha(c3, 'participantes', { x: 984, y: 676, alinhar: 'dir', tam: 40 }),
+  linha(c3, 'ativos no evento', { x: 984, y: 724, alinhar: 'dir', tam: 40 }),
+];
+
+/* ================================================================ CENA 4 */
+const c4 = el('div', 'cena');
+const fundo4 = el('div', 'fundo4', c4, '<img src="imagens/estrada.jpg" alt="">');
+const fundo4img = fundo4.querySelector('img');
+const c4l = [
+  linha(c4, 'Hoje é o último dia, e ainda tem', { x: 984, y: 214, alinhar: 'dir', cls: 'texto branco' }),
+  linha(c4, 'muito negócio acontecendo', { x: 984, y: 272, alinhar: 'dir', cls: 'texto branco' }),
+  linha(c4, 'Venha conhecer', { x: 120, y: 560, cls: 'texto branco' }),
+  linha(c4, 'o Bracerum Park', { x: 120, y: 618, cls: 'texto branco' }),
+];
+const bloco = el('div', 'bloco', c4);
+const stand = linha(bloco, 'STAND', { x: 984 - 212, y: 44, alinhar: 'dir', cls: '', tam: 82 });
+const numero = linha(bloco, 'A 175', { x: 984 - 212, y: 118, alinhar: 'dir', cls: '', tam: 218 });
+for (const l of [stand, numero]) { l.w.style.right = '96px'; l.w.style.left = 'auto'; }
+const logo = el('img', 'logo', c4); logo.src = 'imagens/logo-branco.svg'; logo.alt = 'Bracerum Park';
+const evento = el('div', 'evento', c4, 'EXPO Paraguai-Brasil');
+
+/* ============================================================ UM QUADRO */
+window.quadro = function (t) {
+  /* ---- 1 ---- */
+  visivel(c1, t, C1.ini, C1.sai + 0.5);
+  anima(c1l[0], t, 0.15, C1.sai);
+  anima(c1l[1], t, 0.30, C1.sai + 0.05);
+  const r1 = sai3(p(t, 0.55, 1.0));
+  const s1 = entra2(p(t, C1.sai + 0.08, 0.42));
+  foto1.style.clipPath = `inset(${((1 - r1) * 100).toFixed(2)}% 0 0 0)`;
+  foto1.style.transform = `translateY(${(-s1 * 40).toFixed(2)}px)`;
+  foto1.style.opacity = (1 - s1).toFixed(3);
+  foto1img.style.transform = `scale(${(1.12 - 0.12 * sai3(p(t, 0.55, 4.8))).toFixed(4)})`;
+
+  /* ---- 2 ---- */
+  visivel(c2, t, C2.ini, C2.sai + 0.5);
+  anima(c2t, t, C2.ini, C2.sai);
+  anima(c2s, t, C2.ini + 0.15, C2.sai + 0.03);
+  fatos.forEach((x, i) => {
+    const ini = C2.ini + 0.55 + i * 0.4;
+    const so = entra2(p(t, C2.sai + 0.06 + i * 0.03, 0.42));
+    x.regua.style.transform = `scaleX(${sai3(p(t, ini, 0.7)).toFixed(4)})`;
+    const pn = p(t, ini + 0.1, 1.25);
+    const v = Math.round(x.f.de + (x.f.para - x.f.de) * sai3(pn));
+    x.num.textContent = x.f.fmt(v);
+    x.num.style.opacity = Math.min(1, p(t, ini + 0.1, 0.35)).toFixed(3);
+    x.num.style.transform = `translateY(${((1 - sai3(p(t, ini + 0.1, 0.7))) * 40).toFixed(2)}px)`;
+    x.rot.style.opacity = sai3(p(t, ini + 0.4, 0.6)).toFixed(3);
+    x.rot.style.transform = `translateY(${((1 - sai3(p(t, ini + 0.4, 0.7))) * 24).toFixed(2)}px)`;
+    x.box.style.opacity = (1 - so).toFixed(3);
+    x.box.style.translate = `0 ${(-so * 50).toFixed(2)}px`;
+  });
+  peq.forEach((x, i) => {
+    const ini = C2.ini + 2.3 + i * 0.3;
+    const so = entra2(p(t, C2.sai + 0.18, 0.42));
+    x.regua.style.transform = `scaleX(${sai3(p(t, ini, 0.7)).toFixed(4)})`;
+    const e = sai3(p(t, ini + 0.1, 0.7));
+    x.num.style.opacity = x.rot.style.opacity = Math.min(1, p(t, ini + 0.1, 0.4)).toFixed(3);
+    x.num.style.transform = x.rot.style.transform = `translateY(${((1 - e) * 24).toFixed(2)}px)`;
+    x.box.style.opacity = (1 - so).toFixed(3);
+  });
+
+  /* ---- 3 ---- */
+  visivel(c3, t, C3.ini, C3.sai + 0.8);
+  anima(c3l[0], t, C3.ini, C3.sai + 0.2);
+  anima(c3l[1], t, C3.ini + 0.15, C3.sai + 0.2);
+  const pv = p(t, C3.video, 0.85);
+  moldura.style.opacity = Math.min(1, pv / 0.6).toFixed(3);
+  moldura.style.transform = `translateY(${((1 - sai3(pv)) * 70).toFixed(2)}px)`;
+  const tc = C3.video + 0.45;
+  anima(c3a, t, tc, C3.sai + 0.2);
+  anima(c3n, t, tc + 0.2, C3.sai + 0.2);
+  anima(c3b[0], t, tc + 0.6, C3.sai + 0.2);
+  anima(c3b[1], t, tc + 0.75, C3.sai + 0.2);
+  const pc = p(t, tc + 0.2, 2.6);
+  c3n.s.textContent = fmtMil(pc >= 1 ? 10000 : Math.round(10000 * sai3(pc)));
+  const pp = p(t, tc + 2.8, 0.5);
+  c3n.w.style.scale = (1 + 0.04 * Math.sin(Math.PI * pp)).toFixed(4);
+  c3n.w.style.transformOrigin = '50% 60%';
+
+  /* ---- 4: a foto da estrada sobe por cima de tudo ---- */
+  visivel(c4, t, C4.ini, 99);
+  const pw = vaiVem(p(t, C4.ini, 0.8));
+  c4.style.clipPath = `inset(${((1 - pw) * 100).toFixed(2)}% 0 0 0)`;
+  fundo4img.style.transform = `scale(${(1.14 - 0.14 * sai3(p(t, C4.ini, 8))).toFixed(4)})`;
+  anima(c4l[0], t, C4.ini + 0.7);
+  anima(c4l[1], t, C4.ini + 0.85);
+  anima(c4l[2], t, C4.ini + 1.3);
+  anima(c4l[3], t, C4.ini + 1.45);
+  const pb = sai3(p(t, C4.ini + 1.8, 0.8));
+  bloco.style.transform = `translateX(${((1 - pb) * 100).toFixed(2)}%)`;
+  anima(stand, t, C4.ini + 2.3);
+  anima(numero, t, C4.ini + 2.45, Infinity, 0.85);
+  const pl = sai3(p(t, C4.ini + 3.0, 0.8));
+  logo.style.opacity = evento.style.opacity = pl.toFixed(3);
+  logo.style.transform = evento.style.transform = `translateY(${((1 - pl) * 16).toFixed(2)}px)`;
+};
+
+/* -------------------------------------------- vídeo do estande (cena 3) */
+window.C3 = C3;
+window.trocaVideo = async (src) => {
+  if (videoImg.getAttribute('src') === src) return;
+  const im = new Image(); im.src = src; await im.decode();
+  videoImg.setAttribute('src', src);
+};
+window.FPS = FPS; window.DURACAO = DURACAO;
+
+/* ----------------------------------------- prévia no navegador (loop) */
+const qs = new URLSearchParams(location.search);
+if (!qs.has('render')) {
+  document.body.classList.add('previa');
+  document.documentElement.style.setProperty('--k', Math.min(innerWidth / 1080, innerHeight / 1350) * .96);
+  if (qs.get('video')) videoImg.src = qs.get('video');   // um quadro qualquer do vídeo, só para ver a moldura
+  let t0 = performance.now() - (Number(qs.get('t')) || 0) * 1000, pausa = null;
+  addEventListener('keydown', (e) => {
+    const agora = performance.now();
+    if (e.code === 'Space') { if (pausa === null) pausa = agora; else { t0 += agora - pausa; pausa = null; } }
+    if (e.code === 'ArrowRight') t0 -= 1000;
+    if (e.code === 'ArrowLeft') t0 += 1000;
+  });
+  const passo = (agora) => { quadro((((pausa ?? agora) - t0) / 1000) % DURACAO); requestAnimationFrame(passo); };
+  document.fonts.ready.then(() => requestAnimationFrame(passo));
+} else {
+  quadro(0);
+}
+</script>
+</body>
+</html>
