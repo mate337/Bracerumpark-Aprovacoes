@@ -28,15 +28,24 @@
 'use strict';
 /* ------------------------------------------------------------- tempo --- */
 const FPS = 30;
-const DURACAO = 6;            // segundos; a arte fica parada do fim da contagem até aqui
 const META = 10000;
+
+/* Vídeo na parte branca, acima do texto (opcional).
+   - renderizar.js --video arquivo.mp4  → define window.VIDEO_CFG antes de a página carregar
+   - no navegador: animacao.html?video=caminho/do/video.mp4 (prévia) */
+const qs = new URLSearchParams(location.search);
+const VIDEO = window.VIDEO_CFG || (qs.get('video') ? { src: qs.get('video'), w: 480, h: 848, duracao: 24 } : null);
+const DURACAO = VIDEO ? VIDEO.duracao : 6;   // sem vídeo: a arte fica parada do fim da contagem até 6 s
+const ATRASO = VIDEO ? 0.35 : 0;             // com vídeo, o texto entra logo depois da moldura
+
 const T = {
-  linha1:   { ini: 0.15, dur: 0.75 },   // “Já são mais de”
-  numero:   { ini: 0.40, dur: 0.75 },   // o número sobe para o lugar…
-  contagem: { ini: 0.40, dur: 2.60 },   // …e conta de 0 a 10.000
-  linha3:   { ini: 0.95, dur: 0.75 },   // “participantes”
-  linha4:   { ini: 1.10, dur: 0.75 },   // “ativos no evento”
-  pulso:    { ini: 3.00, dur: 0.50 },   // respiro quando chega em 10.000
+  video:    { ini: 0.00, dur: 0.80 },            // a moldura sobe e aparece
+  linha1:   { ini: 0.15 + ATRASO, dur: 0.75 },   // “Já são mais de”
+  numero:   { ini: 0.40 + ATRASO, dur: 0.75 },   // o número sobe para o lugar…
+  contagem: { ini: 0.40 + ATRASO, dur: 2.60 },   // …e conta de 0 a 10.000
+  linha3:   { ini: 0.95 + ATRASO, dur: 0.75 },   // “participantes”
+  linha4:   { ini: 1.10 + ATRASO, dur: 0.75 },   // “ativos no evento”
+  pulso:    { ini: 3.00 + ATRASO, dur: 0.50 },   // respiro quando chega em 10.000
 };
 
 const sai3 = (x) => 1 - Math.pow(1 - x, 3);          // desacelera
@@ -71,6 +80,38 @@ function desenhaGlifos(g, linha) {
 
 const [L1, LN, L3, L4] = G.linhas;
 const camadas = {};
+
+/* Moldura do vídeo: filete dourado (a cor do número) e cantos retos, com uma
+   sombra leve para descolar do branco. Centrada no eixo do número, com o pé
+   a ~70 px do topo de “Já são mais de”, e abaixo da faixa que o Instagram
+   cobre com a barra do perfil (topo ≥ 250 px). */
+const MOLDURA = { borda: 8, alturaMax: 848, larguraMax: 640, centroX: (LN.x0 + LN.x1) / 2, pe: 1156 };
+let videoG = null, videoImg = null;
+if (VIDEO) {
+  const k = Math.min(MOLDURA.alturaMax / VIDEO.h, MOLDURA.larguraMax / VIDEO.w);
+  const w = Math.round(VIDEO.w * k), h = Math.round(VIDEO.h * k);
+  const x = Math.round(MOLDURA.centroX - w / 2), y = MOLDURA.pe - h, b = MOLDURA.borda;
+  const f = no('filter', { id: 'sombra', x: '-30%', y: '-20%', width: '160%', height: '140%' }, defs);
+  no('feDropShadow', { dx: 0, dy: 16, stdDeviation: 22, 'flood-color': '#000', 'flood-opacity': 0.2 }, f);
+  videoG = no('g', {}, svg);
+  no('rect', { x: x - b, y: y - b, width: w + 2 * b, height: h + 2 * b, fill: LN.cor, filter: 'url(#sombra)' }, videoG);
+  if (window.VIDEO_CFG) {
+    videoImg = no('image', { x, y, width: w, height: h, preserveAspectRatio: 'xMidYMid slice' }, videoG);
+  } else {
+    const fo = no('foreignObject', { x, y, width: w, height: h }, videoG);
+    const v = document.createElement('video');
+    Object.assign(v, { src: VIDEO.src, muted: true, loop: true, autoplay: true, playsInline: true });
+    v.style.cssText = `width:${w}px;height:${h}px;object-fit:cover;display:block`;
+    fo.append(v);
+  }
+}
+/* renderizar.js troca o quadro do vídeo antes de cada foto */
+window.trocaVideo = async (src) => {
+  const im = new Image();
+  im.src = src;
+  await im.decode();
+  videoImg.setAttribute('href', src);
+};
 for (const [nome, linha] of [['linha1', L1], ['linha3', L3], ['linha4', L4]]) {
   const g = janela('j-' + nome, linha, linha.corpo * 1.0, linha.corpo * 0.3);
   g.setAttribute('fill', linha.cor);
@@ -111,6 +152,11 @@ function revela(c, p) {
 }
 
 window.quadro = function (t) {
+  if (videoG) {
+    const pv = prog(t, T.video), e = sai3(pv);
+    videoG.setAttribute('transform', `translate(0 ${((1 - e) * 70).toFixed(3)})`);
+    videoG.setAttribute('opacity', Math.min(1, pv / 0.6).toFixed(3));
+  }
   revela(camadas.linha1, prog(t, T.linha1));
   revela(camadas.numero, prog(t, T.numero));
   revela(camadas.linha3, prog(t, T.linha3));

@@ -28,6 +28,32 @@ baixo precisa ser claro.
 O Instagram não aceita vídeo transparente direto no story. A transparência serve
 para montar no editor e exportar o story pronto.
 
+## Versão com o vídeo do estande
+
+O vídeo gravado no estande (WhatsApp, 12/11, 24 s, retrato 480 × 848) entra
+**emoldurado na parte branca, acima do texto**:
+
+- no tamanho nativo do vídeo (480 × 848), sem ampliar, centrado no eixo do
+  número; o pé da moldura fica a ~70 px de “Já são mais de” e o topo abaixo
+  da faixa que o Instagram cobre com a barra do perfil;
+- **moldura**: filete dourado de 8 px na cor do número (#b3924f), cantos retos
+  e uma sombra leve para descolar do branco;
+- a moldura sobe e aparece primeiro (0 → 0,8 s); o texto e a contagem vêm
+  0,35 s depois; a peça dura o vídeo inteiro (24,1 s) e **leva o som dele**.
+
+| Arquivo | Para quê |
+|---|---|
+| `story-10k-video.mp4` | **Pronto para o story**: fundo branco, H.264 + som. |
+| `story-10k-video-transparente.mov` | ProRes 4444 com alfa + som, para editar. |
+| `story-10k-video-transparente.webm` | VP9 com alfa + som. |
+
+**Esses três ficam fora do git:** o repositório é público e a filmagem mostra
+pessoas identificáveis. Regere com:
+
+```bash
+node renderizar.js --video caminho/para/o/video.mp4
+```
+
 ## Fidelidade
 
 - O texto não é fonte digitada. São os **contornos tirados do próprio .ai**

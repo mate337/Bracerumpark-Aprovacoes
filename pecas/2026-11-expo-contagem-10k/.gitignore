@@ -1,2 +1,5 @@
 # ProRes com alfa (~30 MB): entregue à parte, regere com fonte/renderizar.js
 *.mov
+# Versões com a filmagem do estande: o repositório é público e o vídeo tem
+# pessoas identificáveis — entregue à parte, não versionar
+story-10k-video*
